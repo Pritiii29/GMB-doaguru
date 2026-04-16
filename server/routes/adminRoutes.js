@@ -1,0 +1,24 @@
+const router = require("express").Router();
+const auth = require("../middleware/authmiddleware");
+const upload = require("../middleware/uploadMiddleware");
+
+const {
+    createClient,
+    getClients,
+    toggleClientStatus,
+} = require("../controllers/adminController");
+
+router.post("/clients", auth(["admin"]), createClient);
+router.get("/clients", auth(["admin"]), getClients);
+router.put("/clients/:clientId/status", auth(["admin"]), toggleClientStatus);
+
+// Upload logo
+router.post("/upload", auth(["admin", "client"]), upload.single("logo"), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+    }
+    // Return the relative URL of the uploaded image
+    res.json({ url: `/uploads/${req.file.filename}` });
+});
+
+module.exports = router;
