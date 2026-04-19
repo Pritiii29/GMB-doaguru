@@ -6,7 +6,7 @@ exports.createClient = async (req, res) => {
     const { name, businessName, email, mobile, password, placeId, logo } = req.body;
 
     const clientId = generateClientId(); // Note spelling depends on what was exported. It's actually exported as generateClienetId but assigned locally. So require works.
-    
+
     try {
         const hashed = await bcrypt.hash(password, 10);
 
@@ -41,7 +41,7 @@ exports.getClients = (req, res) => {
             console.error("DB Error in getClients:", err);
             return res.status(500).json({ message: "Error fetching clients: " + err.message, sqlError: err });
         }
-        
+
         // Remove passwords before sending to frontend
         const safeClients = result.map(client => {
             const { password, ...safeData } = client;

@@ -28,7 +28,7 @@ const QRPage = () => {
 
   useGSAP(() => {
     if (!loading && qrData) {
-      gsap.fromTo('.qr-card', 
+      gsap.fromTo('.qr-card',
         { y: 20, opacity: 0 },
         {
           y: 0,

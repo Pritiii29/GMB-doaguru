@@ -93,7 +93,7 @@ const ReviewsPage = () => {
   // Filtering reviews by name, email, or clientId
   const filteredReviews = reviews.filter(res => {
     const matchesSearch = (res.fullName?.toLowerCase().includes(emailFilter.toLowerCase()) ||
-                          res.email?.toLowerCase().includes(emailFilter.toLowerCase()));
+      res.email?.toLowerCase().includes(emailFilter.toLowerCase()));
     const matchesClient = selectedClient === 'all' || res.clientId === selectedClient;
     return matchesSearch && matchesClient;
   });
@@ -158,9 +158,9 @@ const ReviewsPage = () => {
         <div className="px-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full">
             <h3 className="text-lg font-bold text-slate-900 shrink-0">Customer Feedback</h3>
-            
+
             {userRole === 'admin' && (
-              <select 
+              <select
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}
                 className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer"
@@ -207,9 +207,9 @@ const ReviewsPage = () => {
                   </td>
                   {userRole === 'admin' && (
                     <td className="px-6 py-4">
-                       <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200">
-                         {r.businessName || "Unknown"}
-                       </span>
+                      <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200">
+                        {r.businessName || "Unknown"}
+                      </span>
                     </td>
                   )}
                   <td className="px-6 py-4">

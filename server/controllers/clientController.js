@@ -38,12 +38,28 @@ exports.getClientReviews = (req, res) => {
     const clientId = req.user.clientId || req.user.clientID;
     if (!clientId) return res.status(401).json({ message: "Invalid payload" });
 
-    const { type, search } = req.query;
+    const { type, search, dateRange, startDate, endDate } = req.query;
 
     let query = "SELECT * FROM reviews WHERE clientId = ?";
     let params = [clientId];
 
     // Optional filters if they exist
+    if (dateRange) {
+        if (dateRange === 'Custom Range' && startDate && endDate) {
+            query += " AND createdAt >= ? AND createdAt <= ?";
+            params.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        } else if (dateRange === 'This Month') {
+            query += " AND MONTH(createdAt) = MONTH(NOW()) AND YEAR(createdAt) = YEAR(NOW())";
+        } else if (dateRange === 'Last Month') {
+            query += " AND createdAt >= DATE_SUB(DATE_FORMAT(NOW() ,'%Y-%m-01'), INTERVAL 1 MONTH) AND createdAt < DATE_FORMAT(NOW() ,'%Y-%m-01')";
+        } else if (dateRange === 'Last 3 Months') {
+            query += " AND createdAt >= DATE_SUB(NOW(), INTERVAL 3 MONTH)";
+        } else if (dateRange === 'Last 6 Months') {
+            query += " AND createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)";
+        } else if (dateRange === 'Last 12 Months') {
+            query += " AND createdAt >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
+        }
+    }
     if (type) {
         query += " AND isPositive = ?";
         params.push(type === 'positive');

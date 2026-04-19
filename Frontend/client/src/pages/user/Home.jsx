@@ -7,7 +7,7 @@ import ReviewForm from '../../components/ReviewForm';
 const Home = () => {
   const { clientId: routeClientId } = useParams();
   const searchParams = new URLSearchParams(window.location.search);
-  const clientId = searchParams.get("clientId") || routeClientId || "default-client-id";
+  const clientId = searchParams.get("clientId") || routeClientId || "admin";
   const containerRef = useRef(null);
   const [currentRating, setCurrentRating] = useState({ rating: 0, hoverRating: 0 });
 

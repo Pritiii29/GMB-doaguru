@@ -22,10 +22,15 @@ export const reviewService = {
     }
   },
 
-  getAllReviews: async (clientId) => {
+  getAllReviews: async (clientId, dateRange, startDate, endDate) => {
     try {
-      const url = clientId && clientId !== 'all' ? `/review/all?clientId=${clientId}` : '/review/all';
-      const response = await api.get(url);
+      const params = {};
+      if (clientId && clientId !== 'all') params.clientId = clientId;
+      if (dateRange) params.dateRange = dateRange;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+
+      const response = await api.get('/review/all', { params });
       return response.data;
     } catch (error) {
       console.error("API error during getAllReviews:", error);
@@ -133,9 +138,14 @@ export const adminService = {
 };
 
 export const clientService = {
-  getClientReviews: async (type = '', search = '') => {
+  getClientReviews: async (type = '', search = '', dateRange = '', startDate = '', endDate = '') => {
     try {
-      const response = await api.get('/client/reviews', { params: { type, search } });
+      const params = { type, search };
+      if (dateRange) params.dateRange = dateRange;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      
+      const response = await api.get('/client/reviews', { params });
       return response.data;
     } catch (error) {
       console.error("API error during getClientReviews:", error);

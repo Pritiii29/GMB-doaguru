@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import {
   Users,
@@ -37,15 +38,39 @@ const DashboardPage = () => {
     }
   });
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [emailFilter, setEmailFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [userRole, setUserRole] = useState(null);
-  const [selectedClient, setSelectedClient] = useState('all');
+
+  // Extract state from URL if available, else default
+  const timeRange = searchParams.get('dateRange') || 'Last 12 Months';
+  const startDate = searchParams.get('startDate') || '';
+  const endDate = searchParams.get('endDate') || '';
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState('admin');
   const [clients, setClients] = useState([]);
   const itemsPerPage = 8;
   const containerRef = useRef(null);
+
+  // Helper to update URL params
+  const updateUrlParams = (key, value) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (value) {
+      newParams.set(key, value);
+    } else {
+      newParams.delete(key);
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleTimeRangeChange = (option) => {
+    updateUrlParams('dateRange', option);
+    setIsDropdownOpen(false);
+  };
 
   const searchTerm = watch("searchTerm");
 
@@ -87,9 +112,9 @@ const DashboardPage = () => {
         setLoading(true);
         let data;
         if (userRole === 'client') {
-          data = await clientService.getClientReviews();
+          data = await clientService.getClientReviews('', '', timeRange, startDate, endDate);
         } else {
-          data = await reviewService.getAllReviews(selectedClient);
+          data = await reviewService.getAllReviews(selectedClient, timeRange, startDate, endDate);
         }
 
         if (Array.isArray(data)) {
@@ -101,8 +126,12 @@ const DashboardPage = () => {
         setLoading(false);
       }
     };
-    fetchReviewsData();
-  }, [userRole, selectedClient]);
+
+    // Only fetch if not custom range, OR if custom range has both dates set
+    if (timeRange !== 'Custom Range' || (timeRange === 'Custom Range' && startDate && endDate)) {
+      fetchReviewsData();
+    }
+  }, [userRole, selectedClient, timeRange, startDate, endDate]);
 
   useGSAP(() => {
     gsap.from('.dashboard-anim', {
@@ -115,38 +144,99 @@ const DashboardPage = () => {
   }, { scope: containerRef });
 
   // Filter reviews based on selection for admin
-  const filteredData = reviews.filter(r => selectedClient === 'all' || r.clientId === selectedClient);
+  const filteredData = reviews;
 
-  // Stats calculation using filtered data
+  // Stats calculation using filtered data (Layout matched to user's requested style)
   const stats = [
-    { label: 'Total Reviews', value: filteredData.length, icon: MessageSquare, color: 'text-blue-500', bg: 'bg-blue-50', trend: '+12%', up: true },
-    { label: 'Positive', value: filteredData.filter(r => r.rating >= 4).length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50', trend: '85%', up: true },
-    { label: 'Negative', value: filteredData.filter(r => r.rating < 4).length, icon: XCircle, color: 'text-rose-500', bg: 'bg-rose-50', trend: '15%', up: false },
-    { label: 'Avg Rating', value: (filteredData.reduce((acc, curr) => acc + curr.rating, 0) / (filteredData.length || 1)).toFixed(1), icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', trend: '+0.2', up: true },
+    { label: 'Total Reviews', value: filteredData.length, icon: MessageSquare, iconColor: 'text-blue-500', iconBg: 'bg-blue-50', trend: '↑ 12% vs prev period', trendColor: 'text-emerald-500' },
+    { label: 'Positive', value: filteredData.filter(r => r.rating >= 4).length, icon: CheckCircle2, iconColor: 'text-emerald-500', iconBg: 'bg-emerald-50', trend: '↑ 5% vs prev period', trendColor: 'text-emerald-500' },
+    { label: 'Negative', value: filteredData.filter(r => r.rating < 4).length, icon: XCircle, iconColor: 'text-rose-500', iconBg: 'bg-rose-50', trend: '↓ 2% vs prev period', trendColor: 'text-emerald-500' },
+    { label: 'Avg Rating', value: (filteredData.reduce((acc, curr) => acc + curr.rating, 0) / (filteredData.length || 1)).toFixed(1), icon: Star, iconColor: 'text-amber-500', iconBg: 'bg-amber-50', sub: 'Average out of 5' },
   ];
 
-  // Group reviews by date for trend chart
-  const trendData = (() => {
-    const grouped = {};
-    filteredData.forEach(r => {
-      const dateKey = r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : 'Unknown';
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = {
-          date: dateKey,
-          displayDate: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'Unknown',
-          count: 0
-        };
+  // Generate continuous timeline buckets based on selected range
+  const generateTimeBuckets = (range, start, end) => {
+    const buckets = [];
+    const now = new Date();
+
+    const generateMonths = (count) => {
+      for (let i = count - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        buckets.push({
+          key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+          name: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+          reviews: 0
+        });
       }
-      grouped[dateKey].count++;
+    };
+
+    if (range === 'Last 12 Months') {
+      generateMonths(12);
+    } else if (range === 'Last 6 Months') {
+      generateMonths(6);
+    } else if (range === 'Last 3 Months') {
+      generateMonths(3);
+    } else if (range === 'This Month') {
+      generateMonths(1);
+    } else if (range === 'Last Month') {
+      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      buckets.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        name: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+        reviews: 0
+      });
+    } else if (range === 'Custom Range' && start && end) {
+      const sDate = new Date(start);
+      const eDate = new Date(end);
+      const daysDiff = (eDate - sDate) / (1000 * 60 * 60 * 24);
+      if (daysDiff <= 60) {
+        for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+          buckets.push({
+            key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+            name: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+            reviews: 0
+          });
+        }
+      } else {
+        const sMonth = new Date(sDate.getFullYear(), sDate.getMonth(), 1);
+        const eMonth = new Date(eDate.getFullYear(), eDate.getMonth(), 1);
+        for (let d = new Date(sMonth); d <= eMonth; d.setMonth(d.getMonth() + 1)) {
+          buckets.push({
+            key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+            name: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+            reviews: 0
+          });
+        }
+      }
+    } else {
+      generateMonths(12);
+    }
+    return buckets;
+  };
+
+  const sortedTrendData = (() => {
+    const buckets = generateTimeBuckets(timeRange, startDate, endDate);
+
+    filteredData.forEach(r => {
+      if (!r.createdAt) return;
+      const d = new Date(r.createdAt);
+      const isDaily = buckets.length > 0 && buckets[0].key.length > 7;
+
+      let keyToMatch = '';
+      if (isDaily) {
+        keyToMatch = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      } else {
+        keyToMatch = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      }
+
+      const bucket = buckets.find(b => b.key === keyToMatch);
+      if (bucket) {
+        bucket.reviews++;
+      }
     });
 
-    return Object.values(grouped)
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .map(item => ({ name: item.displayDate, reviews: item.count }));
+    return buckets;
   })();
-
-  // Final trend data
-  const sortedTrendData = trendData;
 
   // Rating distribution for bar chart
   const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
@@ -168,22 +258,54 @@ const DashboardPage = () => {
           <p className="text-slate-500 font-medium tracking-tight">Monitoring customer satisfaction in real-time.</p>
         </div>
 
-        {userRole === 'admin' && (
-          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
-             <Filter size={18} className="text-slate-400 ml-2" />
-             <select 
-               value={selectedClient}
-               onChange={(e) => setSelectedClient(e.target.value)}
-               className="bg-transparent border-none outline-none text-sm font-bold text-slate-700 pr-8 cursor-pointer"
-             >
-               <option value="all">Global View (All Clients)</option>
-               <option value="admin">DOAGuru Reviews</option>
-               {clients.map(c => (
-                 <option key={c.clientId} value={c.clientId}>{c.businessName}</option>
-               ))}
-             </select>
+        <div className="flex items-center gap-3">
+          {timeRange === 'Custom Range' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => updateUrlParams('startDate', e.target.value)}
+                className="bg-white px-3 py-2.5 rounded-xl border border-slate-200 shadow-sm text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-sans"
+              />
+              <span className="text-slate-500 font-medium text-sm">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => updateUrlParams('endDate', e.target.value)}
+                className="bg-white px-3 py-2.5 rounded-xl border border-slate-200 shadow-sm text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-sans"
+              />
+            </div>
+          )}
+
+          <div className="relative">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={`flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border shadow-sm text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors ${timeRange === 'Custom Range' ? 'border-emerald-500 ring-1 ring-emerald-500 lg:w-[150px] justify-between' : 'border-slate-200'}`}
+            >
+              {timeRange}
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-10">
+                {['This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'Last 12 Months', 'Custom Range'].map(option => (
+                  <button
+                    key={option}
+                    onClick={() => handleTimeRangeChange(option)}
+                    className={`w-full text-left px-4 py-2 text-sm ${timeRange === option ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'} transition-colors`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          <button className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+            <Download size={16} />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -191,16 +313,24 @@ const DashboardPage = () => {
         {stats.map((stat, i) => (
           <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm dashboard-anim">
             <div className="flex justify-between items-start mb-4">
-              <div className={`${stat.bg} ${stat.color} p-3 rounded-xl`}>
-                <stat.icon size={24} />
+              <div>
+                <h3 className="text-slate-500 text-sm font-medium tracking-tight mb-2">{stat.label}</h3>
+                <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
               </div>
-              <div className={`flex items-center gap-1 text-sm font-bold ${stat.up ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {stat.trend}
-                {stat.up ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+              <div className={`${stat.iconBg} ${stat.iconColor} p-3 rounded-xl`}>
+                <stat.icon size={20} />
               </div>
             </div>
-            <h3 className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-1">{stat.label}</h3>
-            <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
+            {stat.trend && (
+              <div className={`text-sm font-medium mt-auto ${stat.trendColor}`}>
+                {stat.trend}
+              </div>
+            )}
+            {stat.sub && (
+              <div className="text-sm font-medium mt-auto text-slate-400">
+                {stat.sub}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -209,51 +339,34 @@ const DashboardPage = () => {
         {/* Analytics Chart */}
         <div className="xl:col-span-2 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 dashboard-anim overflow-hidden">
           <div className="flex items-center justify-between mb-4 md:mb-8">
-            <h3 className="text-lg font-bold text-slate-900">Review Trends</h3>
+            <h3 className="text-lg font-bold text-slate-900">Monthly Performance</h3>
           </div>
           <div className="h-[280px] md:h-[360px] w-full overflow-x-auto overflow-y-hidden scrollbar-hide">
             <div style={{ minWidth: Math.max(sortedTrendData.length * 60, 500) + 'px', height: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={sortedTrendData} margin={{ top: 10, right: 20, left: 0, bottom: 50 }}>
-                  <defs>
-                    <linearGradient id="colorReviews" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={sortedTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#64748b', fontSize: 11 }}
-                    interval={0}
-                    angle={-40}
+                    angle={-45}
                     textAnchor="end"
-                    height={60}
+                    dy={10}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#64748b', fontSize: 12 }}
-                    width={35}
                     allowDecimals={false}
                   />
                   <Tooltip
+                    cursor={{ fill: 'var(--color-slate-50)' }}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value) => [value, 'Reviews']}
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="reviews"
-                    stroke="var(--color-primary)"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorReviews)"
-                    dot={{ r: 4, fill: 'var(--color-primary)', strokeWidth: 2, stroke: '#fff' }}
-                    activeDot={{ r: 6 }}
-                  />
-                </AreaChart>
+                  <Bar dataKey="reviews" name="Reviews" fill="#93c5fd" radius={[2, 2, 0, 0]} barSize={32} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
