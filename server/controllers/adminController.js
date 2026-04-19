@@ -36,12 +36,19 @@ exports.createClient = async (req, res) => {
 
 // Get Clients
 exports.getClients = (req, res) => {
-    db.query("SELECT id, clientId, name, businessName, email, mobile, placeId, isActive, createdAt FROM clients ORDER BY createdAt DESC", (err, result) => {
+    db.query("SELECT * FROM clients ORDER BY createdAt DESC", (err, result) => {
         if (err) {
-            console.error("DB Error:", err);
-            return res.status(500).json({ message: "Error fetching clients" });
+            console.error("DB Error in getClients:", err);
+            return res.status(500).json({ message: "Error fetching clients: " + err.message, sqlError: err });
         }
-        res.json(result);
+        
+        // Remove passwords before sending to frontend
+        const safeClients = result.map(client => {
+            const { password, ...safeData } = client;
+            return safeData;
+        });
+
+        res.json(safeClients);
     });
 };
 

@@ -131,6 +131,24 @@ export const clientService = {
       console.error("API error during getClientReviews:", error);
       throw error.response?.data || error;
     }
+  },
+  getProfile: async () => {
+    try {
+      const response = await api.get('/client/profile');
+      return response.data;
+    } catch (error) {
+       console.error("API error during getProfile:", error);
+       throw error.response?.data || error;
+    }
+  },
+  updateProfile: async (profileData) => {
+    try {
+       const response = await api.put('/client/profile', profileData);
+       return response.data;
+    } catch (error) {
+       console.error("API error during updateProfile:", error);
+       throw error.response?.data || error;
+    }
   }
 };
 

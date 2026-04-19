@@ -63,7 +63,7 @@ const Navbar = () => {
     ...(user?.role === 'admin' ? [{ name: 'Reviews', path: '/admin/reviews', icon: <MessageSquare size={20} /> }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Clients', path: '/admin/clients', icon: <Users size={20} /> }] : []),
     { name: 'QR Codes', path: '/admin/qrcode', icon: <QrCode size={20} /> },
-    ...(user?.role === 'admin' ? [{ name: 'Settings', path: '/admin/settings', icon: <Settings size={20} /> }] : []),
+    { name: 'Settings', path: '/admin/settings', icon: <Settings size={20} /> },
   ];
 
   return (

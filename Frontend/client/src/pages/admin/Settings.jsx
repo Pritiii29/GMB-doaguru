@@ -3,17 +3,48 @@ import { useForm } from 'react-hook-form';
 import { Save, Store, Link as LinkIcon, Bell } from 'lucide-react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { clientService, authService } from '../../services/api';
 
 const SettingsPage = () => {
   const containerRef = useRef(null);
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: {
-      businessName: 'DOAGuru Infosystems IT Compony',
-      googleReviewLink: 'https://search.google.com/local/writereview?placeid=ChIJT-5eGRaxgTkRxyMc7_psGWI',
-      notificationEmail: 'pritibandewar52@gmail.com',
-      threshold: '4'
+      businessName: '',
+      googleReviewLink: '',
+      notificationEmail: '',
+      threshold: '4',
+      name: '',
+      mobile: ''
     }
   });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const auth = await authService.verifyAuth();
+        setUserRole(auth.user?.role);
+        
+        if (auth.user?.role === 'client') {
+           const profile = await clientService.getProfile();
+           reset({
+             businessName: profile.businessName || '',
+             googleReviewLink: profile.placeId ? `https://search.google.com/local/writereview?placeid=${profile.placeId}` : '',
+             notificationEmail: profile.email || '',
+             name: profile.name || '',
+             mobile: profile.mobile || '',
+             threshold: '4'
+           });
+        }
+      } catch (err) {
+        console.error("Error fetching profile", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [reset]);
 
   const [saving, setSaving] = useState(false);
 
@@ -27,14 +58,37 @@ const SettingsPage = () => {
     });
   }, { scope: containerRef });
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     setSaving(true);
-    console.log("Settings saved:", data);
-    setTimeout(() => {
-      setSaving(false);
-      alert("Settings saved successfully!");
-    }, 1000);
+    try {
+       if (userRole === 'client') {
+          // Extract placeId from googleReviewLink
+          let placeId = '';
+          try {
+             if (data.googleReviewLink.includes('placeid=')) {
+                placeId = data.googleReviewLink.split('placeid=')[1];
+             }
+          } catch(e){}
+
+          await clientService.updateProfile({
+             name: data.name || data.businessName,
+             businessName: data.businessName,
+             mobile: data.mobile || data.notificationEmail,
+             placeId: placeId || data.googleReviewLink
+          });
+          alert("Profile updated successfully!");
+       } else {
+          alert("Settings saved successfully! (Admin placeholder)");
+       }
+    } catch(err) {
+       console.error(err);
+       alert("Error updating profile");
+    } finally {
+       setSaving(false);
+    }
   };
+
+  if (loading) return <div className="p-8">Loading settings...</div>;
 
   return (
     <div ref={containerRef} className="max-w-3xl w-full font-sans">
