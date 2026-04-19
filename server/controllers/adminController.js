@@ -66,3 +66,31 @@ exports.toggleClientStatus = (req, res) => {
         res.json({ message: `Client status updated to ${isActive ? 'Active' : 'Inactive'}` });
     });
 };
+
+exports.updateClient = async (req, res) => {
+    const { clientId } = req.params;
+    const { name, businessName, email, mobile, placeId, logo } = req.body;
+    let password = req.body.password;
+
+    try {
+        let query = "UPDATE clients SET name=?, businessName=?, email=?, mobile=?, placeId=?, logo=? WHERE clientId=?";
+        let params = [name, businessName, email, mobile, placeId, logo, clientId];
+
+        if (password) {
+            const hashed = await bcrypt.hash(password, 10);
+            query = "UPDATE clients SET name=?, businessName=?, email=?, mobile=?, password=?, placeId=?, logo=? WHERE clientId=?";
+            params = [name, businessName, email, mobile, hashed, placeId, logo, clientId];
+        }
+
+        db.query(query, params, (err) => {
+            if (err) {
+                console.error("DB Error updating client:", err);
+                return res.status(500).json({ message: "Error updating client" });
+            }
+            res.json({ message: "Client updated successfully" });
+        });
+    } catch (error) {
+        console.error("Hashing error", error);
+        res.status(500).json({ message: "Error processing request" });
+    }
+};

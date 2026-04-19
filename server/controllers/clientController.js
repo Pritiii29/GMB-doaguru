@@ -1,93 +1,27 @@
 const db = require("../config/db");
-const { v4: uuidv4 } = require("uuid");
 
+exports.getClientProfile = (req, res) => {
+    const clientId = req.user.clientId || req.user.clientID;
+    if (!clientId) return res.status(401).json({ message: "Invalid payload" });
 
-exports.createClient = (req, res) => {
-    const { name, businessName, email, mobile, password, placeID, logo } = req.body;
-
-    if (!name || !email || !password) {
-        return res.status(400).json({ message: "Required fields missing" });
-    }
-
-    const clientID = uuidv4();
-
-    const query = `
-        INSERT INTO clients 
-        (clientID, name, businessName, email, mobile, password, placeID, logo, isActive, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, NOW(), NOW())
-    `;
-
-    db.query(
-        query,
-        [clientID, name, businessName, email, mobile, password, placeID, logo],
-        (err) => {
-            if (err) {
-                console.error(err);
-
-                if (err.code === "ER_DUP_ENTRY") {
-                    return res.status(400).json({ message: "Email already exists" });
-                }
-
-                return res.status(500).json({ message: "Error creating client" });
-            }
-
-            res.status(201).json({
-                message: "Client created successfully",
-                clientID
-            });
+    db.query("SELECT id, clientId, name, businessName, email, mobile, placeId, logo, isActive FROM clients WHERE clientId = ?", [clientId], (err, results) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: "Database error" });
         }
-    );
-};
-
-
-
-exports.clientLogin = (req, res) => {
-    const { email, password } = req.body;
-
-    const query = `SELECT * FROM clients WHERE email = ?`;
-
-    db.query(query, [email], (err, result) => {
-        if (err) return res.status(500).json({ message: "Server error" });
-
-        if (result.length === 0) {
-            return res.status(401).json({ message: "Invalid email" });
-        }
-
-        const client = result[0];
-
-        if (!client.isActive) {
-            return res.status(403).json({
-                message: "Account is deactivated. Contact admin."
-            });
-        }
-
-        if (client.password !== password) {
-            return res.status(401).json({ message: "Invalid password" });
-        }
-
-        res.json({
-            message: "Login successful",
-            client: {
-                id: client.id,
-                clientID: client.clientID,
-                name: client.name,
-                businessName: client.businessName
-            }
-        });
+        if (results.length === 0) return res.status(404).json({ message: "Client not found" });
+        res.json(results[0]);
     });
 };
 
-
-
 exports.updateClientProfile = (req, res) => {
-    const clientId = req.user.id; // from auth middleware
-
+    const clientId = req.user.clientId || req.user.clientID;
     const { name, businessName, mobile, logo } = req.body;
 
     const query = `
         UPDATE clients
         SET name = ?, businessName = ?, mobile = ?, logo = ?, updatedAt = NOW()
-        WHERE id = ?
+        WHERE clientId = ?
     `;
 
     db.query(query, [name, businessName, mobile, logo, clientId], (err) => {
@@ -100,27 +34,32 @@ exports.updateClientProfile = (req, res) => {
     });
 };
 
+exports.getClientReviews = (req, res) => {
+    const clientId = req.user.clientId || req.user.clientID;
+    if (!clientId) return res.status(401).json({ message: "Invalid payload" });
 
-exports.toggleClientStatus = (req, res) => {
-    const clientId = req.params.id;
-    const { isActive } = req.body;
+    const { type, search } = req.query;
 
-    const query = `
-        UPDATE clients
-        SET isActive = ?, updatedAt = NOW()
-        WHERE id = ?
-    `;
+    let query = "SELECT * FROM reviews WHERE clientId = ?";
+    let params = [clientId];
 
-    db.query(query, [isActive, clientId], (err) => {
+    // Optional filters if they exist
+    if (type) {
+        query += " AND isPositive = ?";
+        params.push(type === 'positive');
+    }
+    if (search) {
+        query += " AND (fullName LIKE ? OR email LIKE ?)";
+        params.push(`%${search}%`, `%${search}%`);
+    }
+
+    query += " ORDER BY createdAt DESC";
+
+    db.query(query, params, (err, results) => {
         if (err) {
             console.error(err);
-            return res.status(500).json({ message: "Status update failed" });
+            return res.status(500).json({ message: "Database error" });
         }
-
-        res.json({
-            message: isActive
-                ? "Client activated successfully"
-                : "Client deactivated successfully"
-        });
+        res.json(results);
     });
 };

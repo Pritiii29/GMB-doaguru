@@ -62,6 +62,10 @@ exports.login = (req, res) => {
             return res.status(500).json({ message: "Client account has no password set" });
           }
 
+          if (!user.isActive) {
+            return res.status(403).json({ message: "Account is deactivated. Contact admin." });
+          }
+
           const match = await bcrypt.compare(password, user.password);
 
           if (!match) {
@@ -70,7 +74,7 @@ exports.login = (req, res) => {
 
           const token = jwt.sign(
             {
-              clientId: user.clientId,
+              clientId: user.clientId || user.clientID,
               role: "client",
               businessName: user.businessName,
               logo: user.logo

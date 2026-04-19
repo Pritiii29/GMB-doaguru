@@ -28,13 +28,17 @@ const QRPage = () => {
 
   useGSAP(() => {
     if (!loading && qrData) {
-      gsap.from('.qr-card', {
-        y: 20,
-        opacity: 0,
-        duration: 0.6,
-        stagger: 0.1,
-        ease: 'power2.out'
-      });
+      gsap.fromTo('.qr-card', 
+        { y: 20, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.6,
+          stagger: 0.1,
+          ease: 'power2.out',
+          clearProps: 'all'
+        }
+      );
     }
   }, { scope: containerRef, dependencies: [loading, qrData] });
 

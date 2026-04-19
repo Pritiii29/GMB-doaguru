@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Save, Store, Link as LinkIcon, Bell } from 'lucide-react';
 import gsap from 'gsap';
@@ -25,17 +25,24 @@ const SettingsPage = () => {
       try {
         const auth = await authService.verifyAuth();
         setUserRole(auth.user?.role);
-        
+
         if (auth.user?.role === 'client') {
-           const profile = await clientService.getProfile();
-           reset({
-             businessName: profile.businessName || '',
-             googleReviewLink: profile.placeId ? `https://search.google.com/local/writereview?placeid=${profile.placeId}` : '',
-             notificationEmail: profile.email || '',
-             name: profile.name || '',
-             mobile: profile.mobile || '',
-             threshold: '4'
-           });
+          const profile = await clientService.getProfile();
+          reset({
+            businessName: profile.businessName || '',
+            googleReviewLink: profile.placeId ? `https://search.google.com/local/writereview?placeid=${profile.placeId}` : '',
+            notificationEmail: profile.email || '',
+            name: profile.name || '',
+            mobile: profile.mobile || '',
+            threshold: '4'
+          });
+        } else if (auth.user?.role === 'admin') {
+          reset({
+            businessName: 'DOAGuru Infosystems',
+            googleReviewLink: 'https://search.google.com/local/writereview?placeid=ChIJT-5eGRaxgTkRxyMc7_psGWI',
+            notificationEmail: 'admin@doaguru.com',
+            threshold: '4'
+          });
         }
       } catch (err) {
         console.error("Error fetching profile", err);
@@ -61,30 +68,30 @@ const SettingsPage = () => {
   const onSubmit = async (data) => {
     setSaving(true);
     try {
-       if (userRole === 'client') {
-          // Extract placeId from googleReviewLink
-          let placeId = '';
-          try {
-             if (data.googleReviewLink.includes('placeid=')) {
-                placeId = data.googleReviewLink.split('placeid=')[1];
-             }
-          } catch(e){}
+      if (userRole === 'client') {
+        // Extract placeId from googleReviewLink
+        let placeId = '';
+        try {
+          if (data.googleReviewLink.includes('placeid=')) {
+            placeId = data.googleReviewLink.split('placeid=')[1];
+          }
+        } catch (e) { }
 
-          await clientService.updateProfile({
-             name: data.name || data.businessName,
-             businessName: data.businessName,
-             mobile: data.mobile || data.notificationEmail,
-             placeId: placeId || data.googleReviewLink
-          });
-          alert("Profile updated successfully!");
-       } else {
-          alert("Settings saved successfully! (Admin placeholder)");
-       }
-    } catch(err) {
-       console.error(err);
-       alert("Error updating profile");
+        await clientService.updateProfile({
+          name: data.name || data.businessName,
+          businessName: data.businessName,
+          mobile: data.mobile || data.notificationEmail,
+          placeId: placeId || data.googleReviewLink
+        });
+        alert("Profile updated successfully!");
+      } else {
+        alert("Settings saved successfully! (Admin placeholder)");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating profile");
     } finally {
-       setSaving(false);
+      setSaving(false);
     }
   };
 
@@ -110,8 +117,9 @@ const SettingsPage = () => {
                 <label className="text-sm font-bold text-slate-900 uppercase tracking-tight">Business Name</label>
                 <input
                   type="text"
+                  disabled={userRole === 'admin'}
                   {...register("businessName", { required: "Business name is required" })}
-                  className={`w-full px-4 py-3 border ${errors.businessName ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-300'} rounded-xl bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium`}
+                  className={`w-full px-4 py-3 border ${errors.businessName ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-300'} rounded-xl bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium ${userRole === 'admin' ? 'bg-slate-50 cursor-not-allowed opacity-90' : ''}`}
                   autoComplete="off"
                 />
                 {errors.businessName && <span className="text-red-500 text-[11px] font-bold uppercase">{errors.businessName.message}</span>}
@@ -126,11 +134,12 @@ const SettingsPage = () => {
                   </div>
                   <input
                     type="url"
-                    {...register("googleReviewLink", { 
+                    disabled={userRole === 'admin'}
+                    {...register("googleReviewLink", {
                       required: "Review link is required",
                       pattern: { value: /https?:\/\/.+/, message: "Invalid URL" }
                     })}
-                    className={`w-full pl-11 pr-4 py-3 border ${errors.googleReviewLink ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-300'} rounded-xl bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium`}
+                    className={`w-full pl-11 pr-4 py-3 border ${errors.googleReviewLink ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-300'} rounded-xl bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium ${userRole === 'admin' ? 'bg-slate-50 cursor-not-allowed opacity-90' : ''}`}
                     placeholder="https://g.page/r/..."
                   />
                 </div>
@@ -160,7 +169,6 @@ const SettingsPage = () => {
                 >
                   <option value="5">5 Stars only</option>
                   <option value="4">4 Stars and above</option>
-                  <option value="3">3 Stars and above</option>
                 </select>
                 <p className="text-[13px] text-slate-400 mt-1 font-medium italic">Ratings equal to or above this value will be sent to Google.</p>
               </div>
@@ -169,11 +177,12 @@ const SettingsPage = () => {
                 <label className="text-sm font-bold text-slate-900 uppercase tracking-tight">Internal Feedback Alerts</label>
                 <input
                   type="email"
-                  {...register("notificationEmail", { 
+                  disabled={userRole === 'admin'}
+                  {...register("notificationEmail", {
                     required: "Email is required",
                     pattern: { value: /^\S+@\S+$/i, message: "Invalid email" }
                   })}
-                  className={`w-full px-4 py-3 border ${errors.notificationEmail ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-300'} rounded-xl bg-white text-slate-900 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium`}
+                  className={`w-full px-4 py-3 border ${errors.notificationEmail ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-300'} rounded-xl bg-white text-slate-900 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium ${userRole === 'admin' ? 'bg-slate-50 cursor-not-allowed opacity-90' : ''}`}
                 />
                 {errors.notificationEmail && <span className="text-red-500 text-[11px] font-bold uppercase">{errors.notificationEmail.message}</span>}
                 <p className="text-[13px] text-slate-400 mt-1 font-medium italic">Email address for receiving negative response alerts.</p>

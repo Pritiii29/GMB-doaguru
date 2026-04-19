@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Search, Star, Download } from 'lucide-react';
-import { reviewService, clientService, authService } from '../../services/api';
+import { reviewService, clientService, authService, adminService } from '../../services/api';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
@@ -18,12 +18,16 @@ const ReviewsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const containerRef = useRef(null);
+  const [userRole, setUserRole] = useState(null);
+  const [selectedClient, setSelectedClient] = useState('all');
+  const [clients, setClients] = useState([]);
 
+  const setEmailFilterWithState = (val) => setEmailFilter(val);
   const searchTerm = watch("searchTerm");
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [emailFilter]);
+  }, [emailFilter, selectedClient]);
 
   // Debouncing logic for search
   useEffect(() => {
@@ -35,17 +39,33 @@ const ReviewsPage = () => {
   }, [searchTerm]);
 
   useEffect(() => {
-    const fetchReviewsData = async () => {
+    const initFetch = async () => {
       try {
         const auth = await authService.verifyAuth();
         const role = auth.user?.role;
+        setUserRole(role);
 
+        if (role === 'admin') {
+          const clientsData = await adminService.getClients();
+          setClients(clientsData);
+        }
+      } catch (error) {
+        console.error("Error fetching auth or clients:", error);
+      }
+    };
+    initFetch();
+  }, []);
+
+  useEffect(() => {
+    const fetchReviewsData = async () => {
+      if (!userRole) return;
+      try {
+        setLoading(true);
         let data;
-        if (role === 'client') {
+        if (userRole === 'client') {
           data = await clientService.getClientReviews();
         } else {
-          // Fallback to admin/all
-          data = await reviewService.getAllReviews();
+          data = await reviewService.getAllReviews(selectedClient);
         }
 
         if (Array.isArray(data)) {
@@ -58,7 +78,7 @@ const ReviewsPage = () => {
       }
     };
     fetchReviewsData();
-  }, []);
+  }, [userRole, selectedClient]);
 
   useGSAP(() => {
     gsap.from('.reviews-anim', {
@@ -70,11 +90,13 @@ const ReviewsPage = () => {
     });
   }, { scope: containerRef });
 
-  // Filtering reviews by name or email
-  const filteredReviews = reviews.filter(res =>
-  (res.fullName?.toLowerCase().includes(emailFilter.toLowerCase()) ||
-    res.email?.toLowerCase().includes(emailFilter.toLowerCase()))
-  );
+  // Filtering reviews by name, email, or clientId
+  const filteredReviews = reviews.filter(res => {
+    const matchesSearch = (res.fullName?.toLowerCase().includes(emailFilter.toLowerCase()) ||
+                          res.email?.toLowerCase().includes(emailFilter.toLowerCase()));
+    const matchesClient = selectedClient === 'all' || res.clientId === selectedClient;
+    return matchesSearch && matchesClient;
+  });
 
   // Pagination logic
   const totalPages = Math.ceil(filteredReviews.length / itemsPerPage);
@@ -134,7 +156,24 @@ const ReviewsPage = () => {
 
       <div className="bg-white rounded-2xl py-6 shadow-sm border border-slate-200 reviews-anim overflow-hidden">
         <div className="px-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h3 className="text-lg font-bold text-slate-900">Customer Feedback</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full">
+            <h3 className="text-lg font-bold text-slate-900 shrink-0">Customer Feedback</h3>
+            
+            {userRole === 'admin' && (
+              <select 
+                value={selectedClient}
+                onChange={(e) => setSelectedClient(e.target.value)}
+                className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer"
+              >
+                <option value="all">All Clients</option>
+                <option value="admin">DOAGuru Reviews</option>
+                {clients.map(c => (
+                  <option key={c.clientId} value={c.clientId}>{c.businessName}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
@@ -150,6 +189,7 @@ const ReviewsPage = () => {
             <thead>
               <tr className="bg-slate-50 border-y border-slate-100">
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer</th>
+                {userRole === 'admin' && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Branch/Business</th>}
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rating</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Feedback</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Date & Time</th>
@@ -165,6 +205,13 @@ const ReviewsPage = () => {
                       <span className="text-[10px] text-slate-400 font-medium mt-0.5">{r.mobile}</span>
                     </div>
                   </td>
+                  {userRole === 'admin' && (
+                    <td className="px-6 py-4">
+                       <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200">
+                         {r.businessName || "Unknown"}
+                       </span>
+                    </td>
+                  )}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-600 rounded-lg w-fit">
                       <Star size={14} fill="currentColor" />

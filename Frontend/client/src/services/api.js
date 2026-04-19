@@ -22,9 +22,10 @@ export const reviewService = {
     }
   },
 
-  getAllReviews: async () => {
+  getAllReviews: async (clientId) => {
     try {
-      const response = await api.get('/review/all');
+      const url = clientId && clientId !== 'all' ? `/review/all?clientId=${clientId}` : '/review/all';
+      const response = await api.get(url);
       return response.data;
     } catch (error) {
       console.error("API error during getAllReviews:", error);
@@ -93,6 +94,15 @@ export const adminService = {
     } catch (error) {
        console.error("API error during createClient:", error);
        throw error.response?.data || error;
+    }
+  },
+  updateClient: async (clientId, clientData) => {
+    try {
+      const response = await api.put(`/admin/clients/${clientId}`, clientData);
+      return response.data;
+    } catch (error) {
+      console.error("API error during updateClient:", error);
+      throw error.response?.data || error;
     }
   },
   toggleClientStatus: async (clientId, isActive) => {

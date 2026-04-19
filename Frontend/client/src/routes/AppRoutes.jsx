@@ -27,7 +27,8 @@ const AppRoutes = () => {
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
         {/* Public Funnel Routes */}
-        <Route path="/" element={<Navigate to="/review/default-client-id" replace />} />
+        <Route path="/" element={<Navigate to="/review?clientId=default-client-id" replace />} />
+        <Route path="/review" element={<Home />} />
         <Route path="/review/:clientId" element={<Home />} />
         <Route path="/thank-you" element={<ThankYou />} />
         <Route path="/redirect" element={<Redirect />} />

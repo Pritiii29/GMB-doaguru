@@ -5,7 +5,9 @@ import { useParams } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 
 const Home = () => {
-  const { clientId } = useParams();
+  const { clientId: routeClientId } = useParams();
+  const searchParams = new URLSearchParams(window.location.search);
+  const clientId = searchParams.get("clientId") || routeClientId || "default-client-id";
   const containerRef = useRef(null);
   const [currentRating, setCurrentRating] = useState({ rating: 0, hoverRating: 0 });
 

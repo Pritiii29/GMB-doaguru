@@ -26,7 +26,7 @@ import {
   Bar,
   Cell
 } from 'recharts';
-import { reviewService, clientService, authService } from '../../services/api';
+import { reviewService, clientService, authService, adminService } from '../../services/api';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
@@ -42,6 +42,8 @@ const DashboardPage = () => {
   const [emailFilter, setEmailFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [userRole, setUserRole] = useState(null);
+  const [selectedClient, setSelectedClient] = useState('all');
+  const [clients, setClients] = useState([]);
   const itemsPerPage = 8;
   const containerRef = useRef(null);
 
@@ -61,18 +63,33 @@ const DashboardPage = () => {
   }, [searchTerm]);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const initFetch = async () => {
       try {
         const auth = await authService.verifyAuth();
         const role = auth.user?.role;
         setUserRole(role);
 
+        if (role === 'admin') {
+          const clientsData = await adminService.getClients();
+          setClients(clientsData);
+        }
+      } catch (error) {
+        console.error("Error fetching auth or clients:", error);
+      }
+    };
+    initFetch();
+  }, []);
+
+  useEffect(() => {
+    const fetchReviewsData = async () => {
+      if (!userRole) return;
+      try {
+        setLoading(true);
         let data;
-        if (role === 'client') {
+        if (userRole === 'client') {
           data = await clientService.getClientReviews();
         } else {
-          // Fallback to admin/all
-          data = await reviewService.getAllReviews();
+          data = await reviewService.getAllReviews(selectedClient);
         }
 
         if (Array.isArray(data)) {
@@ -84,8 +101,8 @@ const DashboardPage = () => {
         setLoading(false);
       }
     };
-    fetchDashboardData();
-  }, []);
+    fetchReviewsData();
+  }, [userRole, selectedClient]);
 
   useGSAP(() => {
     gsap.from('.dashboard-anim', {
@@ -97,30 +114,44 @@ const DashboardPage = () => {
     });
   }, { scope: containerRef });
 
-  // Stats calculation
+  // Filter reviews based on selection for admin
+  const filteredData = reviews.filter(r => selectedClient === 'all' || r.clientId === selectedClient);
+
+  // Stats calculation using filtered data
   const stats = [
-    { label: 'Total Reviews', value: reviews.length, icon: MessageSquare, color: 'text-blue-500', bg: 'bg-blue-50', trend: '+12%', up: true },
-    { label: 'Positive', value: reviews.filter(r => r.rating >= 4).length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50', trend: '85%', up: true },
-    { label: 'Negative', value: reviews.filter(r => r.rating < 4).length, icon: XCircle, color: 'text-rose-500', bg: 'bg-rose-50', trend: '15%', up: false },
-    { label: 'Avg Rating', value: (reviews.reduce((acc, curr) => acc + curr.rating, 0) / (reviews.length || 1)).toFixed(1), icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', trend: '+0.2', up: true },
+    { label: 'Total Reviews', value: filteredData.length, icon: MessageSquare, color: 'text-blue-500', bg: 'bg-blue-50', trend: '+12%', up: true },
+    { label: 'Positive', value: filteredData.filter(r => r.rating >= 4).length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50', trend: '85%', up: true },
+    { label: 'Negative', value: filteredData.filter(r => r.rating < 4).length, icon: XCircle, color: 'text-rose-500', bg: 'bg-rose-50', trend: '15%', up: false },
+    { label: 'Avg Rating', value: (filteredData.reduce((acc, curr) => acc + curr.rating, 0) / (filteredData.length || 1)).toFixed(1), icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', trend: '+0.2', up: true },
   ];
 
   // Group reviews by date for trend chart
-  const reviewTrendData = (() => {
+  const trendData = (() => {
     const grouped = {};
-    reviews.forEach(r => {
-      const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'Unknown';
-      grouped[date] = (grouped[date] || 0) + 1;
+    filteredData.forEach(r => {
+      const dateKey = r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : 'Unknown';
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = {
+          date: dateKey,
+          displayDate: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'Unknown',
+          count: 0
+        };
+      }
+      grouped[dateKey].count++;
     });
-    return Object.entries(grouped)
-      .map(([date, count]) => ({ name: date, reviews: count }))
-      .sort((a, b) => new Date(a.name) - new Date(b.name));
+
+    return Object.values(grouped)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(item => ({ name: item.displayDate, reviews: item.count }));
   })();
+
+  // Final trend data
+  const sortedTrendData = trendData;
 
   // Rating distribution for bar chart
   const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
     name: `${star} Star`,
-    count: reviews.filter(r => r.rating === star).length
+    count: filteredData.filter(r => r.rating === star).length
   }));
 
   if (loading) return (
@@ -134,8 +165,25 @@ const DashboardPage = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 dashboard-anim">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard Overview</h1>
-          <p className="text-slate-500 font-medium">Monitoring your customer feedback and satisfaction in real-time.</p>
+          <p className="text-slate-500 font-medium tracking-tight">Monitoring customer satisfaction in real-time.</p>
         </div>
+
+        {userRole === 'admin' && (
+          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+             <Filter size={18} className="text-slate-400 ml-2" />
+             <select 
+               value={selectedClient}
+               onChange={(e) => setSelectedClient(e.target.value)}
+               className="bg-transparent border-none outline-none text-sm font-bold text-slate-700 pr-8 cursor-pointer"
+             >
+               <option value="all">Global View (All Clients)</option>
+               <option value="admin">DOAGuru Reviews</option>
+               {clients.map(c => (
+                 <option key={c.clientId} value={c.clientId}>{c.businessName}</option>
+               ))}
+             </select>
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -164,9 +212,9 @@ const DashboardPage = () => {
             <h3 className="text-lg font-bold text-slate-900">Review Trends</h3>
           </div>
           <div className="h-[280px] md:h-[360px] w-full overflow-x-auto overflow-y-hidden scrollbar-hide">
-            <div style={{ minWidth: Math.max(reviewTrendData.length * 60, 500) + 'px', height: '100%' }}>
+            <div style={{ minWidth: Math.max(sortedTrendData.length * 60, 500) + 'px', height: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={reviewTrendData} margin={{ top: 10, right: 20, left: 0, bottom: 50 }}>
+                <AreaChart data={sortedTrendData} margin={{ top: 10, right: 20, left: 0, bottom: 50 }}>
                   <defs>
                     <linearGradient id="colorReviews" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2} />

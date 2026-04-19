@@ -6,11 +6,13 @@ const {
     createClient,
     getClients,
     toggleClientStatus,
+    updateClient,
 } = require("../controllers/adminController");
 
 router.post("/clients", auth(["admin"]), createClient);
 router.get("/clients", auth(["admin"]), getClients);
 router.put("/clients/:clientId/status", auth(["admin"]), toggleClientStatus);
+router.put("/clients/:clientId", auth(["admin"]), updateClient);
 
 // Upload logo
 router.post("/upload", auth(["admin", "client"]), upload.single("logo"), (req, res) => {

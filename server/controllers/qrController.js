@@ -3,11 +3,11 @@ const QRCode = require('qrcode');
 exports.generateQRCode = async (req, res) => {
     try {
         // Assume req.user contains clientId from admin dashboard or similar
-        const clientId = req.user.clientId || 'demo-client';
-        
+        const clientId = req.user?.clientId || req.user?.clientID || 'admin';
+
         // Define frontend base URL ideally from env
         const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const reviewUrl = `${baseUrl}/review/${clientId}`;
+        const reviewUrl = `${baseUrl}/review?clientId=${clientId}`;
 
         // Generate QR Code as Data URI
         const qrCodeDataUrl = await QRCode.toDataURL(reviewUrl, {

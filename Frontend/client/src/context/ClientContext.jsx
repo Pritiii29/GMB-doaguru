@@ -64,6 +64,28 @@ export const ClientProvider = ({ children }) => {
     }
   };
 
+  const updateClient = async (clientId, clientData, logoFile, setUploadingLogo) => {
+    try {
+      let logoUrl = clientData.logo;
+      if (logoFile) {
+        if (setUploadingLogo) setUploadingLogo(true);
+        const uploadRes = await adminService.uploadLogo(logoFile);
+        logoUrl = uploadRes.url;
+        if (setUploadingLogo) setUploadingLogo(false);
+      }
+      
+      const updatedClient = await adminService.updateClient(clientId, {
+        ...clientData,
+        logo: logoUrl
+      });
+      await fetchClients();
+      return updatedClient;
+    } catch (err) {
+      if (setUploadingLogo) setUploadingLogo(false);
+      throw err;
+    }
+  };
+
   return (
     <ClientContext.Provider value={{
       clients,
@@ -71,6 +93,7 @@ export const ClientProvider = ({ children }) => {
       error,
       fetchClients,
       createClient,
+      updateClient,
       toggleClientStatus
     }}>
       {children}
