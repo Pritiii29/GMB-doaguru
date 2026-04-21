@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Star } from 'lucide-react';
+import { Star, User, Phone, MessageSquare, Send } from 'lucide-react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { reviewService } from '../services/api';
@@ -11,7 +11,6 @@ const ReviewForm = ({ onRatingChange, clientId }) => {
     defaultValues: {
       rating: 0,
       name: '',
-      email: '',
       phone: '',
       review: ''
     }
@@ -24,7 +23,7 @@ const ReviewForm = ({ onRatingChange, clientId }) => {
   const formRef = useRef(null);
 
   useGSAP(() => {
-    if (rating > 0 && rating < 4) {
+    if (rating > 0) {
       gsap.to('.feedback-section', {
         height: 'auto',
         opacity: 1,
@@ -62,7 +61,6 @@ const ReviewForm = ({ onRatingChange, clientId }) => {
       const result = await reviewService.submitReview({
         clientId: clientId, // Include clientId here
         fullName: data.name,
-        email: data.email,
         mobile: data.phone,
         rating: data.rating,
         review: data.review
@@ -86,91 +84,89 @@ const ReviewForm = ({ onRatingChange, clientId }) => {
   return (
     <>
       <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="w-full text-left">
-        <div className="flex flex-col gap-5 mb-6">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-400 uppercase ml-1">Full Name</label>
+        <div className="flex flex-col gap-6 mb-8 mt-2">
+          {/* Name Input */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors z-10">
+              <User size={22} strokeWidth={2} />
+            </div>
             <input
               type="text"
               {...register("name", { required: "Name is required" })}
-              className={`w-full px-4 py-3 bg-slate-50 border ${errors.name ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200'} rounded-xl text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-medium`}
-              placeholder="Enter Full Name"
+              className={`w-full pl-12 pr-4 py-4 bg-slate-50/70 hover:bg-slate-50 border-2 ${errors.name ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-100 hover:border-slate-200 focus:border-primary focus:ring-primary/20'} rounded-2xl text-[15px] outline-none focus:ring-4 transition-all font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-medium shadow-sm`}
+              placeholder="Your Full Name"
             />
-            {errors.name && <span className="text-red-500 text-[11px] font-bold ml-1 uppercase">{errors.name.message}</span>}
+            {errors.name && <p className="absolute -bottom-5 left-2 text-red-500 text-[11px] font-bold tracking-wide">{errors.name.message}</p>}
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-400 uppercase ml-1">Email Address</label>
-            <input
-              type="email"
-              {...register("email", {
-                required: "Email is required",
-                pattern: { value: /^\S+@\S+$/i, message: "Invalid email format" }
-              })}
-              className={`w-full px-4 py-3 bg-slate-50 border ${errors.email ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200'} rounded-xl text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-medium`}
-              placeholder="Enter your email"
-            />
-            {errors.email && <span className="text-red-500 text-[11px] font-bold ml-1 uppercase">{errors.email.message}</span>}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-400 uppercase ml-1">Phone Number</label>
+          {/* Phone Input */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors z-10">
+              <Phone size={22} strokeWidth={2} />
+            </div>
             <input
               type="tel"
               {...register("phone", {
-                required: "Phone is required",
+                required: "Phone number is required",
                 pattern: { value: /^[6-9]\d{9}$/, message: "Invalid 10-digit number" }
               })}
               maxLength={10}
-              className={`w-full px-4 py-3 bg-slate-50 border ${errors.phone ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200'} rounded-xl text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-medium`}
-              placeholder="9876543210"
+              className={`w-full pl-12 pr-4 py-4 bg-slate-50/70 hover:bg-slate-50 border-2 ${errors.phone ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-100 hover:border-slate-200 focus:border-primary focus:ring-primary/20'} rounded-2xl text-[15px] outline-none focus:ring-4 transition-all font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-medium shadow-sm`}
+              placeholder="Your Phone Number"
             />
-            {errors.phone && <span className="text-red-500 text-[11px] font-bold ml-1 uppercase">{errors.phone.message}</span>}
+            {errors.phone && <p className="absolute -bottom-5 left-2 text-red-500 text-[11px] font-bold tracking-wide">{errors.phone.message}</p>}
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 mb-8 items-center">
-          <label className="text-xs font-bold text-slate-400 uppercase mb-1">Rate your experience</label>
-          <div className="flex justify-center gap-1">
+        {/* Rating Section */}
+        <div className="flex flex-col gap-3 mb-8 items-center bg-slate-50/50 p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+          <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Rate your experience</label>
+          <div className="flex justify-center gap-2 relative z-10">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
                 type="button"
-                className={`star-${star} p-1 transition-all rounded-full ${star <= (hoverRating || rating) ? 'text-amber-400' : 'text-slate-200'}`}
+                className={`star-${star} p-1.5 transition-all rounded-full hover:scale-110 ${star <= (hoverRating || rating) ? 'text-amber-400 drop-shadow-md' : 'text-slate-200 hover:text-slate-300'}`}
                 onClick={() => handleRatingClick(star)}
                 onMouseEnter={() => setHoverRating(star)}
                 onMouseLeave={() => setHoverRating(0)}
               >
                 <Star
-                  size={42}
+                  size={44}
                   fill={star <= (hoverRating || rating) ? "currentColor" : "none"}
-                  strokeWidth={1.5}
+                  strokeWidth={star <= (hoverRating || rating) ? 0 : 2}
                 />
               </button>
             ))}
           </div>
-          {rating === 0 && <span className="text-slate-400 text-[10px] font-bold uppercase mt-1">Please select a rating</span>}
+          {rating === 0 && <span className="text-slate-400 text-[11px] font-bold mt-1">Please select a rating</span>}
         </div>
 
+        {/* Feedback Textarea */}
         <div className="feedback-section h-0 opacity-0 overflow-hidden">
-          <div className="flex flex-col gap-2 mb-4">
-            <label className="text-xs font-bold text-slate-400 uppercase ml-1">Your Message</label>
+          <div className="relative group mb-8 mt-2">
+            <div className="absolute top-4 left-4 pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors z-10">
+              <MessageSquare size={22} strokeWidth={2} />
+            </div>
             <textarea
               {...register("review", {
-                required: "Message is required",
-                pattern: { message: "Invalid message format" }
+                required: "Message is required"
               })}
-              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px] resize-none font-medium"
-              placeholder="Tell us what went wrong..."
+              className={`w-full pl-12 pr-4 py-4 bg-slate-50/70 hover:bg-slate-50 border-2 border-slate-100 hover:border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/20 rounded-2xl text-[15px] outline-none transition-all min-h-[120px] resize-none font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-medium shadow-sm leading-relaxed ${errors.review ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20' : ''}`}
+              placeholder="Tell us about your experience..."
             />
+            {errors.review && <p className="absolute -bottom-5 left-2 text-red-500 text-[11px] font-bold tracking-wide">{errors.review.message}</p>}
           </div>
         </div>
 
         <button
           type="submit"
-          className="w-full py-4 text-lg font-bold rounded-xl bg-gradient-to-br from-primary to-secondary text-white shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all disabled:opacity-50 disabled:transform-none"
+          className="w-full py-4 px-6 text-[17px] font-bold rounded-2xl bg-gradient-to-r from-primary to-secondary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/40 hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center gap-2 group"
           disabled={rating === 0}
         >
-          Submit Feedback
+          <span>Submit Feedback</span>
+          <Send size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
         </button>
       </form>
 
