@@ -14,10 +14,21 @@ const Login = () => {
     setError('');
 
     try {
-      await authService.login(data.email, data.password);
-      navigate('/admin/dashboard'); 
+        const response = await authService.login(data.email, data.password);
+      
+      // Check if user needs subscription
+      if (response.needsSubscription) {
+        navigate(`/subscription/${response.clientId}`);
+      } else {
+        navigate('/admin/dashboard'); 
+      }
     } catch (err) {
-      setError(err.message || 'Invalid credentials. Please try again.');
+      // Check if error is about subscription
+      if (err.needsSubscription) {
+        navigate(`/subscription/${err.clientId}`);
+      } else {
+        setError(err.message || 'Invalid credentials. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

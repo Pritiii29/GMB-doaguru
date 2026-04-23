@@ -94,3 +94,36 @@ exports.updateClient = async (req, res) => {
         res.status(500).json({ message: "Error processing request" });
     }
 };
+
+// Notifications
+exports.getNotifications = (req, res) => {
+    db.query("SELECT * FROM notifications ORDER BY createdAt DESC", (err, result) => {
+        if (err) {
+            console.error("DB Error in getNotifications:", err);
+            return res.status(500).json({ message: "Error fetching notifications" });
+        }
+        res.json(result);
+    });
+};
+
+exports.markNotificationRead = (req, res) => {
+    const { id } = req.params;
+    db.query("UPDATE notifications SET is_read = 1 WHERE id = ?", [id], (err) => {
+        if (err) {
+            console.error("DB Error in markNotificationRead:", err);
+            return res.status(500).json({ message: "Error updating notification" });
+        }
+        res.json({ message: "Notification marked as read" });
+    });
+};
+
+exports.testNotifications = async (req, res) => {
+    try {
+        const checkRenewals = require('../utils/renewalCron');
+        await checkRenewals();
+        res.json({ message: "Renewal check triggered successfully. Check server console for logs." });
+    } catch (error) {
+        console.error("Error triggering test notifications:", error);
+        res.status(500).json({ message: "Error triggering check" });
+    }
+};

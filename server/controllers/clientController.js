@@ -38,9 +38,10 @@ exports.getClientReviews = (req, res) => {
     const clientId = req.user.clientId || req.user.clientID;
     if (!clientId) return res.status(401).json({ message: "Invalid payload" });
 
-    const { type, search, dateRange, startDate, endDate } = req.query;
+    const { type, search, dateRange, startDate, endDate, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
 
-    let query = "SELECT * FROM reviews WHERE clientId = ?";
+    let query = " FROM reviews WHERE clientId = ?";
     let params = [clientId];
 
     // Optional filters if they exist
@@ -69,13 +70,54 @@ exports.getClientReviews = (req, res) => {
         params.push(`%${search}%`, `%${search}%`);
     }
 
-    query += " ORDER BY createdAt DESC";
+    const countQuery = `SELECT COUNT(*) as total ${query}`;
 
-    db.query(query, params, (err, results) => {
+    db.query(countQuery, params, (err, countResult) => {
         if (err) {
-            console.error(err);
+            console.error("Error in getClientReviews count:", err);
             return res.status(500).json({ message: "Database error" });
         }
-        res.json(results);
+
+        const total = countResult[0].total;
+        const dataQuery = `SELECT * ${query} ORDER BY createdAt DESC LIMIT ? OFFSET ?`;
+
+        db.query(dataQuery, [...params, parseInt(limit), parseInt(offset)], (err, results) => {
+            if (err) {
+                console.error("Error in getClientReviews data:", err);
+                return res.status(500).json({ message: "Database error" });
+            }
+            res.json({
+                reviews: results,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / limit)
+                }
+            });
+        });
+    });
+};
+
+exports.getClientNotifications = (req, res) => {
+    const clientId = req.user.clientId || req.user.clientID;
+    db.query("SELECT * FROM notifications WHERE clientId = ? ORDER BY createdAt DESC", [clientId], (err, result) => {
+        if (err) {
+            console.error("DB Error in getClientNotifications:", err);
+            return res.status(500).json({ message: "Error fetching notifications" });
+        }
+        res.json(result);
+    });
+};
+
+exports.markClientNotificationRead = (req, res) => {
+    const { id } = req.params;
+    const clientId = req.user.clientId || req.user.clientID;
+    db.query("UPDATE notifications SET is_read = 1 WHERE id = ? AND clientId = ?", [id, clientId], (err) => {
+        if (err) {
+            console.error("DB Error in markClientNotificationRead:", err);
+            return res.status(500).json({ message: "Error updating notification" });
+        }
+        res.json({ message: "Notification marked as read" });
     });
 };

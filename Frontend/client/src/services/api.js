@@ -22,13 +22,15 @@ export const reviewService = {
     }
   },
 
-  getAllReviews: async (clientId, dateRange, startDate, endDate) => {
+  getAllReviews: async (clientId, dateRange, startDate, endDate, page = 1, limit = 10) => {
     try {
       const params = {};
       if (clientId && clientId !== 'all') params.clientId = clientId;
       if (dateRange) params.dateRange = dateRange;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
+      if (page) params.page = page;
+      if (limit) params.limit = limit;
 
       const response = await api.get('/review/all', { params });
       return response.data;
@@ -134,13 +136,31 @@ export const adminService = {
       console.error("API error during uploadLogo:", error);
       throw error.response?.data || error;
     }
+  },
+  getNotifications: async () => {
+    try {
+      const response = await api.get('/admin/notifications');
+      return response.data;
+    } catch (error) {
+      console.error("API error during getNotifications:", error);
+      throw error.response?.data || error;
+    }
+  },
+  markNotificationRead: async (id) => {
+    try {
+      const response = await api.put(`/admin/notifications/${id}/read`);
+      return response.data;
+    } catch (error) {
+      console.error("API error during markNotificationRead:", error);
+      throw error.response?.data || error;
+    }
   }
 };
 
 export const clientService = {
-  getClientReviews: async (type = '', search = '', dateRange = '', startDate = '', endDate = '') => {
+  getClientReviews: async (type = '', search = '', dateRange = '', startDate = '', endDate = '', page = 1, limit = 10) => {
     try {
-      const params = { type, search };
+      const params = { type, search, page, limit };
       if (dateRange) params.dateRange = dateRange;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
@@ -168,6 +188,144 @@ export const clientService = {
     } catch (error) {
        console.error("API error during updateProfile:", error);
        throw error.response?.data || error;
+    }
+  },
+  getNotifications: async () => {
+    try {
+      const response = await api.get('/client/notifications');
+      return response.data;
+    } catch (error) {
+      console.error("API error during getNotifications:", error);
+      throw error.response?.data || error;
+    }
+  },
+  markNotificationRead: async (id) => {
+    try {
+      const response = await api.put(`/client/notifications/${id}/read`);
+      return response.data;
+    } catch (error) {
+      console.error("API error during markNotificationRead:", error);
+      throw error.response?.data || error;
+    }
+  }
+};
+
+export const subscriptionService = {
+  getSubscriptionPlans: async () => {
+    try {
+      const response = await api.get('/subscription/plans');
+      return response.data;
+    } catch (error) {
+      console.error("API error during getSubscriptionPlans:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  getPlanById: async (planId) => {
+    try {
+      const response = await api.get(`/subscription/plans/${planId}`);
+      return response.data;
+    } catch (error) {
+      console.error("API error during getPlanById:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  getActiveClientForSubscription: async (clientId) => {
+    try {
+      const response = await api.get(`/subscription/client/${clientId}`);
+      return response.data;
+    } catch (error) {
+      console.error("API error during getActiveClientForSubscription:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  getMySubscription: async () => {
+    try {
+      const response = await api.get('/subscription/my-subscription');
+      return response.data;
+    } catch (error) {
+      console.error("API error during getMySubscription:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  checkSubscriptionValidity: async () => {
+    try {
+      const response = await api.get('/subscription/check-validity');
+      return response.data;
+    } catch (error) {
+      console.error("API error during checkSubscriptionValidity:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  registerSubscription: async (clientId, planId, paymentData = {}) => {
+    try {
+      const response = await api.post('/subscription/register', {
+        clientId,
+        planId,
+        auto_renew: paymentData.autoRenew ?? true,
+        amount_paid: paymentData.amountPaid ?? 0,
+        payment_method: paymentData.paymentMethod ?? 'manual',
+        transaction_id: paymentData.transactionId ?? null,
+        notes: paymentData.notes ?? ''
+      });
+      return response.data;
+    } catch (error) {
+      console.error("API error during registerSubscription:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  getAllSubscriptions: async () => {
+    try {
+      const response = await api.get('/subscription/admin/all');
+      return response.data;
+    } catch (error) {
+      console.error("API error during getAllSubscriptions:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  getSubscriptionStats: async () => {
+    try {
+      const response = await api.get('/subscription/admin/stats');
+      return response.data;
+    } catch (error) {
+      console.error("API error during getSubscriptionStats:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  getClientSubscriptionHistory: async (clientId) => {
+    try {
+      const response = await api.get(`/subscription/admin/history/${clientId}`);
+      return response.data;
+    } catch (error) {
+      console.error("API error during getClientSubscriptionHistory:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  cancelSubscription: async (subscriptionId) => {
+    try {
+      const response = await api.put(`/subscription/cancel/${subscriptionId}`);
+      return response.data;
+    } catch (error) {
+      console.error("API error during cancelSubscription:", error);
+      throw error.response?.data || error;
+    }
+  },
+
+  renewSubscription: async (subscriptionId) => {
+    try {
+      const response = await api.put(`/subscription/renew/${subscriptionId}`);
+      return response.data;
+    } catch (error) {
+      console.error("API error during renewSubscription:", error);
+      throw error.response?.data || error;
     }
   }
 };

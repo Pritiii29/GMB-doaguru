@@ -7,6 +7,9 @@ const {
     getClients,
     toggleClientStatus,
     updateClient,
+    getNotifications,
+    markNotificationRead,
+    testNotifications,
 } = require("../controllers/adminController");
 
 router.post("/clients", auth(["admin"]), createClient);
@@ -22,5 +25,10 @@ router.post("/upload", auth(["admin", "client"]), upload.single("logo"), (req, r
     // Return the relative URL of the uploaded image
     res.json({ url: `/uploads/${req.file.filename}` });
 });
+
+// Notifications
+router.get("/notifications", auth(["admin"]), getNotifications);
+router.put("/notifications/:id/read", auth(["admin"]), markNotificationRead);
+router.get("/test-notifications", auth(["admin"]), testNotifications);
 
 module.exports = router;

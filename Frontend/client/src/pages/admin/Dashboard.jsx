@@ -112,12 +112,15 @@ const DashboardPage = () => {
         setLoading(true);
         let data;
         if (userRole === 'client') {
-          data = await clientService.getClientReviews('', '', timeRange, startDate, endDate);
+          // Fetch more for dashboard to have accurate stats/charts
+          data = await clientService.getClientReviews('', '', timeRange, startDate, endDate, 1, 500);
         } else {
-          data = await reviewService.getAllReviews(selectedClient, timeRange, startDate, endDate);
+          data = await reviewService.getAllReviews(selectedClient, timeRange, startDate, endDate, 1, 500);
         }
 
-        if (Array.isArray(data)) {
+        if (data && data.reviews) {
+          setReviews(data.reviews);
+        } else if (Array.isArray(data)) {
           setReviews(data);
         }
       } catch (error) {

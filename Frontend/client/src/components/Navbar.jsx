@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, QrCode, Settings, LogOut, Menu, X, Users, MessageSquare } from 'lucide-react';
-import { authService } from '../services/api';
+import { LayoutDashboard, QrCode, Settings, LogOut, Menu, X, Users, MessageSquare, CreditCard, Bell } from 'lucide-react';
+import { authService, adminService } from '../services/api';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import logo from '../assets/logo.jpeg';
@@ -12,6 +12,9 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [isNotifyOpen, setIsNotifyOpen] = useState(false);
+  const notificationRef = useRef(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -27,6 +30,48 @@ const Navbar = () => {
     };
     fetchUser();
   }, [navigate]);
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      const fetchNotifications = async () => {
+        try {
+          const data = await adminService.getNotifications();
+          setNotifications(data);
+        } catch (error) {
+          console.error("Failed to fetch notifications:", error);
+        }
+      };
+      fetchNotifications();
+      // Poll every 5 minutes
+      const interval = setInterval(fetchNotifications, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotifyOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleMarkAsRead = async (id) => {
+    try {
+      if (user.role === 'admin') {
+        await adminService.markNotificationRead(id);
+      } else {
+        await clientService.markNotificationRead(id);
+      }
+      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n));
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const handleSignOut = async () => {
     try {
@@ -61,7 +106,11 @@ const Navbar = () => {
   const navItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard size={20} /> },
     { name: 'Reviews', path: '/admin/reviews', icon: <MessageSquare size={20} /> },
-    ...(user?.role === 'admin' ? [{ name: 'Clients', path: '/admin/clients', icon: <Users size={20} /> }] : []),
+    ...(user?.role === 'admin' ? [
+      { name: 'Notifications', path: '/admin/notifications', icon: <Bell size={20} /> },
+      { name: 'Clients', path: '/admin/clients', icon: <Users size={20} /> },
+      { name: 'Subscriptions', path: '/admin/subscriptions', icon: <CreditCard size={20} /> }
+    ] : []),
     { name: 'QR Codes', path: '/admin/qrcode', icon: <QrCode size={20} /> },
     { name: 'Settings', path: '/admin/settings', icon: <Settings size={20} /> },
   ];
@@ -113,7 +162,7 @@ const Navbar = () => {
         <nav className="flex-1 py-6 px-4 overflow-y-auto overflow-x-hidden">
           <ul className="flex flex-col gap-2">
             {navItems.map((item) => (
-              <li key={item.path} className="nav-item-anim">
+              <li key={item.name} className="nav-item-anim">
                 <NavLink
                   to={item.path}
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -122,6 +171,11 @@ const Navbar = () => {
                 >
                   <div className="shrink-0">{item.icon}</div>
                   <span className={`transition-all duration-300 ${isDesktopSidebarOpen ? 'opacity-100' : 'md:opacity-0 md:w-0'}`}>{item.name}</span>
+                  {item.name === 'Notifications' && unreadCount > 0 && (
+                    <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
                 </NavLink>
               </li>
             ))}
@@ -167,6 +221,68 @@ const Navbar = () => {
             )}
             <span className="hidden sm:block">{user?.role === 'admin' ? 'Admin' : (user?.businessName || 'Client')}</span>
           </div>
+
+          {user?.role === 'admin' && (
+            <div className="relative mr-4" ref={notificationRef}>
+              <button
+                onClick={() => setIsNotifyOpen(!isNotifyOpen)}
+                className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors relative"
+              >
+                <Bell size={22} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotifyOpen && (
+                <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50">
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h3 className="font-bold text-slate-900">Notifications</h3>
+                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">
+                      {unreadCount} New
+                    </span>
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        <Bell size={32} className="mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">No notifications yet</p>
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`p-4 border-b border-slate-50 transition-colors hover:bg-slate-50 cursor-pointer ${!n.is_read ? 'bg-blue-50/30' : ''}`}
+                          onClick={() => !n.is_read && handleMarkAsRead(n.id)}
+                        >
+                          <div className="flex gap-3">
+                            <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.is_read ? 'bg-primary' : 'bg-transparent'}`} />
+                            <div className="flex-1">
+                              <p className={`text-sm ${!n.is_read ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>
+                                {n.message}
+                              </p>
+                              <p className="text-[11px] text-slate-400 mt-1">
+                                {new Date(n.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {notifications.length > 0 && (
+                    <div className="p-3 text-center border-t border-slate-100">
+                      <button className="text-xs font-bold text-slate-500 hover:text-primary transition-colors">
+                        View All Notifications
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="p-4 md:p-8 flex-1 overflow-x-hidden">

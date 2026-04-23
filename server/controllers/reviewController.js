@@ -58,14 +58,10 @@ exports.submitReview = (req, res) => {
 // Admin dashboard ke liye
 // Admin dashboard ke liye - Sare reviews with Business Name
 exports.getAllReviews = (req, res) => {
-  const { clientId, dateRange, startDate, endDate } = req.query;
+  const { clientId, dateRange, startDate, endDate, page = 1, limit = 10 } = req.query;
+  const offset = (page - 1) * limit;
 
   let query = `
-    SELECT r.*, 
-    CASE 
-      WHEN r.clientId = 'admin' THEN 'DOAGuru'
-      ELSE c.businessName 
-    END as businessName
     FROM reviews r
     LEFT JOIN clients c ON r.clientId = c.clientId
     WHERE 1=1
@@ -94,13 +90,40 @@ exports.getAllReviews = (req, res) => {
     }
   }
 
-  query += " ORDER BY r.createdAt DESC";
-
-  db.query(query, params, (err, results) => {
+  const countQuery = `SELECT COUNT(*) as total ${query}`;
+  
+  db.query(countQuery, params, (err, countResult) => {
     if (err) {
-      console.error("Error in getAllReviews:", err);
+      console.error("Error in getAllReviews count:", err);
       return res.status(500).json({ message: "DB Error" });
     }
-    res.json(results);
+
+    const total = countResult[0].total;
+    const dataQuery = `
+      SELECT r.*, 
+      CASE 
+        WHEN r.clientId = 'admin' THEN 'DOAGuru'
+        ELSE c.businessName 
+      END as businessName
+      ${query}
+      ORDER BY r.createdAt DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    db.query(dataQuery, [...params, parseInt(limit), parseInt(offset)], (err, results) => {
+      if (err) {
+        console.error("Error in getAllReviews data:", err);
+        return res.status(500).json({ message: "DB Error" });
+      }
+      res.json({
+        reviews: results,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    });
   });
 };

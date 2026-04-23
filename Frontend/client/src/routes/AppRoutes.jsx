@@ -12,6 +12,7 @@ const LoadingFallback = () => (
 const Home = lazy(() => import('../pages/user/Home'));
 const ThankYou = lazy(() => import('../pages/user/ThankYou'));
 const Redirect = lazy(() => import('../pages/user/Redirect'));
+const SubscriptionRedirect = lazy(() => import('../pages/user/SubscriptionRedirect'));
 
 // Lazy Loading Admin Pages
 const Dashboard = lazy(() => import('../pages/admin/Dashboard'));
@@ -20,6 +21,8 @@ const Clients = lazy(() => import('../pages/admin/Clients'));
 const Login = lazy(() => import('../pages/admin/Login'));
 const QRPage = lazy(() => import('../pages/admin/QRPage'));
 const Settings = lazy(() => import('../pages/admin/Settings'));
+const SubscriptionManagement = lazy(() => import('../pages/admin/SubscriptionManagement'));
+const Notifications = lazy(() => import('../pages/admin/Notifications'));
 const Navbar = lazy(() => import('../components/Navbar'));
 
 const AppRoutes = () => {
@@ -32,6 +35,7 @@ const AppRoutes = () => {
         <Route path="/review/:clientId" element={<Home />} />
         <Route path="/thank-you" element={<ThankYou />} />
         <Route path="/redirect" element={<Redirect />} />
+        <Route path="/subscription/:clientId" element={<SubscriptionRedirect />} />
 
         {/* Admin Authentication */}
         <Route path="/admin/login" element={<Login />} />
@@ -44,6 +48,8 @@ const AppRoutes = () => {
           <Route path="clients" element={<Clients />} />
           <Route path="qrcode" element={<QRPage />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="subscriptions" element={<SubscriptionManagement />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
       </Routes>
     </Suspense>

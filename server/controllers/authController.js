@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const ensureSubscriptionSchema = require("../utils/ensureSubscriptionSchema");
 
 exports.login = (req, res) => {
   const { email, password } = req.body;
@@ -72,23 +73,63 @@ exports.login = (req, res) => {
             return res.status(400).json({ message: "Invalid password" });
           }
 
-          const token = jwt.sign(
-            {
-              clientId: user.clientId || user.clientID,
-              role: "client",
-              businessName: user.businessName,
-              logo: user.logo
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: "1d" }
-          );
+          ensureSubscriptionSchema()
+            .then(() => {
+              // Check subscription validity
+              db.query(
+                "SELECT s.*, p.name as planName FROM subscriptions s JOIN subscription_plans p ON s.planId = p.id WHERE s.clientId = ? AND s.status = 'active' AND s.end_date > NOW()",
+                [user.clientId],
+                (err, subscriptionResult) => {
+                  if (err) {
+                    console.error(err);
+                    return res.status(500).json({ message: "Error checking subscription" });
+                  }
 
-          res.cookie("token", token, {
-            httpOnly: true,
-            sameSite: "lax",
-          });
+                  const hasActiveSubscription = subscriptionResult && subscriptionResult.length > 0;
 
-          return res.json({ message: "Client login success", role: "client" });
+                  if (!hasActiveSubscription) {
+                    // Return a special message that indicates subscription is required
+                    return res.status(403).json({
+                      message: "No active subscription. Please register for a subscription plan.",
+                      needsSubscription: true,
+                      clientId: user.clientId
+                    });
+                  }
+
+                  const token = jwt.sign(
+                    {
+                      clientId: user.clientId || user.clientID,
+                      role: "client",
+                      businessName: user.businessName,
+                      logo: user.logo,
+                      subscriptionId: subscriptionResult[0].id,
+                      planName: subscriptionResult[0].planName
+                    },
+                    process.env.JWT_SECRET,
+                    { expiresIn: "1d" }
+                  );
+
+                  res.cookie("token", token, {
+                    httpOnly: true,
+                    sameSite: "lax",
+                  });
+
+                  return res.json({
+                    message: "Client login success",
+                    role: "client",
+                    subscription: {
+                      id: subscriptionResult[0].id,
+                      planName: subscriptionResult[0].planName,
+                      endDate: subscriptionResult[0].end_date
+                    }
+                  });
+                }
+              );
+            })
+            .catch((error) => {
+              console.error("Subscription setup error:", error);
+              return res.status(500).json({ message: "Subscription setup failed" });
+            });
         } catch (error) {
           console.error("Client login verification error:", error);
           return res.status(500).json({ message: "Internal server error during login" });

@@ -40,7 +40,7 @@ const SettingsPage = () => {
           reset({
             businessName: 'DOAGuru Infosystems',
             googleReviewLink: 'https://search.google.com/local/writereview?placeid=ChIJT-5eGRaxgTkRxyMc7_psGWI',
-            notificationEmail: 'admin@doaguru.com',
+            notificationEmail: 'doaguruinfosystems@gmail.com',
             threshold: '4'
           });
         }

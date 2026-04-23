@@ -6,7 +6,9 @@ const checkClientActive = require("../middleware/checkClientActive");
 const {
     getClientReviews,
     updateClientProfile,
-    getClientProfile
+    getClientProfile,
+    getClientNotifications,
+    markClientNotificationRead
 } = require("../controllers/clientController");
 
 
@@ -19,6 +21,10 @@ router.put("/profile", updateClientProfile);
 
 
 router.get("/reviews", getClientReviews);
+
+// Notifications
+router.get("/notifications", getClientNotifications);
+router.put("/notifications/:id/read", markClientNotificationRead);
 
 
 module.exports = router;
