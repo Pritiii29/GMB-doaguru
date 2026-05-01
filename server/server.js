@@ -12,17 +12,15 @@ const adminRoutes = require("./routes/adminRoutes");
 const clientRoutes = require("./routes/clientRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const ensureSubscriptionSchema = require("./utils/ensureSubscriptionSchema");
-require("./utils/renewalCron"); // Import starts the cron job
-
-// CORS Configuration - CRITICAL for Axios withCredentials
+require("./utils/renewalCron"); 
 app.use(cors({
     origin: function (origin, callback) {
-        // Mirror the origin back if it's localhost or an IP, or if it's undefined (like non-browser requests)
+        
         const allowedOrigins = [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/, /^http:\/\/192\.168\.\d+\.\d+:\d+$/];
         const isAllowed = !origin || allowedOrigins.some(pattern => pattern.test(origin));
         
         if (isAllowed) {
-            callback(null, origin); // Reflect the actual origin
+            callback(null, origin);
         } else {
             callback(new Error('Origin not allowed by CORS'));
         }
@@ -44,7 +42,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/api/review", reviewRoutes);
-app.use("/api/login", authRoutes); // This handles /, /logout, /verify
+app.use("/api/login", authRoutes); 
 app.use("/api/qr", qrRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/client", clientRoutes);

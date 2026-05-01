@@ -220,6 +220,11 @@ const SubscriptionManagement = () => {
               {subscriptionPlans.map(plan => (
             <div key={plan.id} className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
               <div className="mb-4">
+                {plan.badge && (
+                  <div className="inline-block px-3 py-1 mb-3 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
+                    {plan.badge}
+                  </div>
+                )}
                 <h3 className="text-xl font-bold text-slate-900">{plan.name}</h3>
                 <p className="text-sm text-slate-500 mt-1">{plan.description}</p>
               </div>

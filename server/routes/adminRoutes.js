@@ -29,6 +29,6 @@ router.post("/upload", auth(["admin", "client"]), upload.single("logo"), (req, r
 // Notifications
 router.get("/notifications", auth(["admin"]), getNotifications);
 router.put("/notifications/:id/read", auth(["admin"]), markNotificationRead);
-router.get("/test-notifications", auth(["admin"]), testNotifications);
+// router.get("/test-notifications", auth(["admin"]), testNotifications);
 
 module.exports = router;

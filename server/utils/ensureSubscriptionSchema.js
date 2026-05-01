@@ -2,36 +2,51 @@ const db = require("../config/db");
 
 const defaultPlans = [
   {
+    code: "starter",
     name: "Starter",
-    description: "Perfect for new businesses",
+    description: "Essential tools to start collecting reviews",
     price: 0,
     durationDays: 30,
+    currency: "INR",
     maxReviewsPerMonth: 100,
-    features: ["Unlimited QR Codes", "Basic Analytics", "Email Support"],
-  },
-  {
-    name: "Professional",
-    description: "For growing businesses",
-    price: 4999,
-    durationDays: 30,
-    maxReviewsPerMonth: 1000,
-    features: ["Unlimited QR Codes", "Advanced Analytics", "Priority Support", "Custom Branding"],
-  },
-  {
-    name: "Enterprise",
-    description: "For large organizations",
-    price: 9999,
-    durationDays: 30,
-    maxReviewsPerMonth: null,
     features: [
-      "Unlimited QR Codes",
-      "Advanced Analytics",
-      "24/7 Support",
-      "Custom Branding",
-      "API Access",
-      "Dedicated Account Manager",
+      "Review Collection System",
+      "Review Tracking",
     ],
   },
+  {
+    code: "professional",
+    name: "Professional",
+    description: "Advanced tools to grow your business",
+    price: 399,
+    durationDays: 30,
+    currency: "INR",
+    maxReviewsPerMonth: 100,
+    features: [
+      "AI-Powered Auto Reply",
+      "WhatsApp Integration",
+      "Negative Review Alerts (Email)",
+      "Detailed Analytics & Insights",
+      "Priority Support"
+    ],
+    // badge: "Most Popular"
+  },
+  {
+    code: "enterprise",
+    name: "Enterprise",
+    description: "Complete automation for scaling businesses",
+    price: 599,
+    durationDays: 30,
+    currency: "INR",
+    maxReviewsPerMonth: null,
+    features: [
+      "Full Review Automation Suite",
+      "Advanced AI Auto Reply (Customizable)",
+      "WhatsApp Automation",
+      "Real-Time Negative Review Alerts (Email + WhatsApp)",
+      "24/7 Dedicated Support"
+    ],
+  }
 ];
 
 let schemaPromise;
@@ -107,6 +122,7 @@ const ensureSubscriptionSchema = async () => {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS subscription_plans (
         id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        plan_code varchar(50) DEFAULT NULL,
         name varchar(100) NOT NULL,
         description text,
         price decimal(10, 2) NOT NULL,
@@ -114,6 +130,7 @@ const ensureSubscriptionSchema = async () => {
         duration_days int(11) DEFAULT 30,
         max_reviews_per_month int(11) DEFAULT NULL,
         features json,
+        badge varchar(100) DEFAULT NULL,
         is_active tinyint(1) DEFAULT 1,
         createdAt timestamp DEFAULT current_timestamp(),
         updatedAt timestamp DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -122,6 +139,7 @@ const ensureSubscriptionSchema = async () => {
     `);
 
     await ensureColumns(connection, "subscription_plans", [
+      { name: "plan_code", definition: "plan_code varchar(50) DEFAULT NULL" },
       { name: "name", definition: "name varchar(100) NULL" },
       { name: "description", definition: "description text" },
       { name: "price", definition: "price decimal(10, 2) NOT NULL DEFAULT 0" },
@@ -129,6 +147,7 @@ const ensureSubscriptionSchema = async () => {
       { name: "duration_days", definition: "duration_days int(11) DEFAULT 30" },
       { name: "max_reviews_per_month", definition: "max_reviews_per_month int(11) DEFAULT NULL" },
       { name: "features", definition: "features json" },
+      { name: "badge", definition: "badge varchar(100) DEFAULT NULL" },
       { name: "is_active", definition: "is_active tinyint(1) DEFAULT 1" },
       { name: "updatedAt", definition: "updatedAt timestamp DEFAULT current_timestamp() ON UPDATE current_timestamp()" },
     ]);
@@ -189,20 +208,29 @@ const ensureSubscriptionSchema = async () => {
       await connection.query(
         `
           INSERT INTO subscription_plans
-            (name, description, price, duration_days, max_reviews_per_month, features, is_active)
-          SELECT ?, ?, ?, ?, ?, ?, 1
-          WHERE NOT EXISTS (
-            SELECT 1 FROM subscription_plans WHERE name = ?
-          )
+            (plan_code, name, description, price, currency, duration_days, max_reviews_per_month, features, badge, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+          ON DUPLICATE KEY UPDATE
+            plan_code = VALUES(plan_code),
+            description = VALUES(description),
+            price = VALUES(price),
+            currency = VALUES(currency),
+            duration_days = VALUES(duration_days),
+            max_reviews_per_month = VALUES(max_reviews_per_month),
+            features = VALUES(features),
+            badge = VALUES(badge),
+            is_active = VALUES(is_active)
         `,
         [
+          plan.code,
           plan.name,
           plan.description,
           plan.price,
+          plan.currency || "INR",
           plan.durationDays,
           plan.maxReviewsPerMonth,
           JSON.stringify(plan.features),
-          plan.name,
+          plan.badge || null,
         ]
       );
     }
@@ -215,3 +243,4 @@ const ensureSubscriptionSchema = async () => {
 };
 
 module.exports = ensureSubscriptionSchema;
+module.exports.defaultPlans = defaultPlans;

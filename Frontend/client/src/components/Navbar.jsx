@@ -212,7 +212,7 @@ const Navbar = () => {
           <div className="flex items-center gap-3 font-medium text-slate-700">
             {user?.role === 'client' && user?.logo ? (
               <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
-                <img src={`http://localhost:5000${user.logo}`} alt="Client Logo" className="w-full h-full object-cover" />
+                <img src={`https://gmb.doaguru.com/${user.logo}`} alt="Client Logo" className="w-full h-full object-cover" />
               </div>
             ) : (
               <div className="w-9 h-9 rounded-full bg-slate-100 text-primary flex items-center justify-center font-semibold border border-slate-200 overflow-hidden shrink-0">

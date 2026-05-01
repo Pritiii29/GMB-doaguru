@@ -1,34 +1,73 @@
 const db = require("../config/db");
+const { defaultPlans } = require("../utils/ensureSubscriptionSchema");
 
-// Get all subscription plans
-exports.getSubscriptionPlans = (req, res) => {
-  const query = "SELECT * FROM subscription_plans WHERE is_active = 1 AND name IS NOT NULL ORDER BY price ASC";
+const mapConfiguredPlan = (plan, dbPlan = {}) => ({
+  id: dbPlan.id ?? null,
+  plan_code: plan.code,
+  name: plan.name,
+  description: plan.description,
+  price: plan.price,
+  currency: plan.currency || "INR",
+  duration_days: plan.durationDays,
+  max_reviews_per_month: plan.maxReviewsPerMonth,
+  features: plan.features,
+  badge: plan.badge || null,
+  is_active: dbPlan.is_active ?? 1,
+});
 
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Database error" });
-    }
-    res.json(results);
-  });
+const findConfiguredPlan = (dbPlan) =>
+  defaultPlans.find(
+    (plan) => plan.code === dbPlan?.plan_code || plan.name === dbPlan?.name
+  );
+
+const getCodeDrivenPlans = async () => {
+  const [dbPlans] = await db
+    .promise()
+    .query("SELECT id, plan_code, name, is_active FROM subscription_plans WHERE name IS NOT NULL");
+
+  const plansByCode = new Map(
+    dbPlans.filter((plan) => plan.plan_code).map((plan) => [plan.plan_code, plan])
+  );
+  const plansByName = new Map(dbPlans.map((plan) => [plan.name, plan]));
+
+  return defaultPlans
+    .map((plan) => {
+      const dbPlan = plansByCode.get(plan.code) || plansByName.get(plan.name);
+      return mapConfiguredPlan(plan, dbPlan);
+    })
+    .filter((plan) => plan.is_active === 1 || plan.is_active === true);
 };
 
-// Get subscription plan by ID
-exports.getSubscriptionPlanById = (req, res) => {
+// Get all subscription plans
+exports.getSubscriptionPlans = async (req, res) => {
+  try {
+    const plans = await getCodeDrivenPlans();
+    res.json(plans);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Database error" });
+  }
+};
+
+exports.getSubscriptionPlanById = async (req, res) => {
   const { planId } = req.params;
 
-  const query = "SELECT * FROM subscription_plans WHERE id = ? AND name IS NOT NULL";
+  try {
+    const plans = await getCodeDrivenPlans();
+    const numericPlanId = Number(planId);
+    const plan = plans.find(
+      (item) => item.id === numericPlanId || item.plan_code === planId
+    );
 
-  db.query(query, [planId], (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Database error" });
-    }
-    if (results.length === 0) {
+    if (!plan) {
       return res.status(404).json({ message: "Plan not found" });
     }
-    res.json(results[0]);
-  });
+
+    res.json(plan);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Database error" });
+  }
 };
 
 // Get active client details for subscription page
@@ -107,94 +146,93 @@ exports.getClientSubscription = (req, res) => {
 };
 
 // Register a subscription for a client (Admin only)
-exports.registerSubscription = (req, res) => {
-  const { clientId, planId, auto_renew = true, amount_paid = 0, payment_method = 'manual', transaction_id = null, notes = '' } = req.body;
+exports.registerSubscription = async (req, res) => {
+  const {
+    clientId,
+    planId,
+    planCode,
+    auto_renew = true,
+    amount_paid = 0,
+    payment_method = 'manual',
+    transaction_id = null,
+    notes = ''
+  } = req.body;
 
-  if (!clientId || !planId) {
+  if (!clientId || (!planId && !planCode)) {
     return res.status(400).json({ message: "clientId and planId are required" });
   }
 
-  // Get plan details
-  db.query("SELECT * FROM subscription_plans WHERE id = ? AND name IS NOT NULL AND is_active = 1", [planId], (err, planResults) => {
-    if (err || planResults.length === 0) {
+  try {
+    const connection = db.promise();
+    const planLookupQuery = planId
+      ? "SELECT id, plan_code, name, is_active FROM subscription_plans WHERE id = ? AND name IS NOT NULL AND is_active = 1"
+      : "SELECT id, plan_code, name, is_active FROM subscription_plans WHERE plan_code = ? AND name IS NOT NULL AND is_active = 1";
+    const planLookupValue = planId || planCode;
+    const [planResults] = await connection.query(planLookupQuery, [planLookupValue]);
+
+    if (planResults.length === 0) {
       return res.status(404).json({ message: "Plan not found" });
     }
 
-    const plan = planResults[0];
+    const dbPlan = planResults[0];
+    const configuredPlan = findConfiguredPlan(dbPlan);
+
+    if (!configuredPlan) {
+      return res.status(404).json({ message: "Plan configuration not found in code" });
+    }
+
+    const resolvedPlanId = dbPlan.id;
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.duration_days);
+    endDate.setDate(endDate.getDate() + configuredPlan.durationDays);
 
-    // Check if client already has an active subscription
-    db.query(
+    const [existingResults] = await connection.query(
       "SELECT * FROM subscriptions WHERE clientId = ? AND status = 'active'",
-      [clientId],
-      (err, existingResults) => {
-        if (err) {
-          return res.status(500).json({ message: "Database error" });
-        }
-
-        if (existingResults.length > 0) {
-          // Deactivate old subscription and record history
-          const oldSubscriptionId = existingResults[0].id;
-          const oldPlanId = existingResults[0].planId;
-
-          db.query(
-            "UPDATE subscriptions SET status = 'expired' WHERE id = ?",
-            [oldSubscriptionId],
-            (err) => {
-              if (err) console.error(err);
-
-              // Record in history
-              db.query(
-                "INSERT INTO subscription_history (clientId, subscriptionId, action, old_planId, new_planId, notes) VALUES (?, ?, ?, ?, ?, ?)",
-                [clientId, oldSubscriptionId, 'upgraded', oldPlanId, planId, 'Subscription changed'],
-                (err) => {
-                  if (err) console.error(err);
-                }
-              );
-            }
-          );
-        }
-
-        // Insert new subscription
-        const insertQuery = `
-          INSERT INTO subscriptions 
-          (clientId, planId, status, start_date, end_date, auto_renew, amount_paid, payment_method, transaction_id, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        db.query(
-          insertQuery,
-          [clientId, planId, 'active', startDate, endDate, auto_renew, amount_paid, payment_method, transaction_id, notes],
-          (err, result) => {
-            if (err) {
-              console.error(err);
-              return res.status(500).json({ message: "Failed to register subscription" });
-            }
-
-            // Record in history
-            db.query(
-              "INSERT INTO subscription_history (clientId, subscriptionId, action, new_planId) VALUES (?, ?, ?, ?)",
-              [clientId, result.insertId, 'created', planId],
-              (err) => {
-                if (err) console.error(err);
-              }
-            );
-
-            res.status(201).json({
-              message: "Subscription registered successfully",
-              subscriptionId: result.insertId,
-              clientId,
-              planId,
-              startDate,
-              endDate
-            });
-          }
-        );
-      }
+      [clientId]
     );
-  });
+
+    if (existingResults.length > 0) {
+      const oldSubscriptionId = existingResults[0].id;
+      const oldPlanId = existingResults[0].planId;
+
+      await connection.query(
+        "UPDATE subscriptions SET status = 'expired' WHERE id = ?",
+        [oldSubscriptionId]
+      );
+
+      await connection.query(
+        "INSERT INTO subscription_history (clientId, subscriptionId, action, old_planId, new_planId, notes) VALUES (?, ?, ?, ?, ?, ?)",
+        [clientId, oldSubscriptionId, 'upgraded', oldPlanId, resolvedPlanId, 'Subscription changed']
+      );
+    }
+
+    const [result] = await connection.query(
+      `
+        INSERT INTO subscriptions
+        (clientId, planId, status, start_date, end_date, auto_renew, amount_paid, payment_method, transaction_id, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [clientId, resolvedPlanId, 'active', startDate, endDate, auto_renew, amount_paid, payment_method, transaction_id, notes]
+    );
+
+    await connection.query(
+      "INSERT INTO subscription_history (clientId, subscriptionId, action, new_planId) VALUES (?, ?, ?, ?)",
+      [clientId, result.insertId, 'created', resolvedPlanId]
+    );
+
+    res.status(201).json({
+      message: "Subscription registered successfully",
+      subscriptionId: result.insertId,
+      clientId,
+      planId: resolvedPlanId,
+      planCode: configuredPlan.code,
+      startDate,
+      endDate
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to register subscription" });
+  }
 };
 
 // Get all subscriptions for a client (Admin)
@@ -241,16 +279,15 @@ exports.getAllSubscriptions = (req, res) => {
 exports.getSubscriptionStats = (req, res) => {
   const query = `
     SELECT 
-      COUNT(DISTINCT CASE WHEN s.status = 'active' AND s.end_date > NOW() THEN s.clientId END) as activeSubscriptions,
-      COUNT(DISTINCT CASE WHEN s.status = 'expired' OR (s.status = 'active' AND s.end_date <= NOW()) THEN s.clientId END) as expiredSubscriptions,
-      COUNT(DISTINCT CASE WHEN s.status = 'cancelled' THEN s.clientId END) as cancelledSubscriptions,
-      SUM(CASE WHEN s.status = 'active' AND s.end_date > NOW() THEN s.amount_paid ELSE 0 END) as totalActiveRevenue,
+      COUNT(DISTINCT CASE WHEN status = 'active' THEN clientId END) as activeSubscriptions,
+      COUNT(DISTINCT CASE WHEN status = 'expired' THEN clientId END) as expiredSubscriptions,
+      COUNT(DISTINCT CASE WHEN status = 'cancelled' THEN clientId END) as cancelledSubscriptions,
+      SUM(CASE WHEN status = 'active' THEN amount_paid ELSE 0 END) as totalActiveRevenue,
       p.name as planName,
       COUNT(*) as count
     FROM subscriptions s
     LEFT JOIN subscription_plans p ON s.planId = p.id
-    GROUP BY p.id, p.name
-    ORDER BY p.price ASC
+    GROUP BY p.name
   `;
 
   db.query(query, (err, results) => {
@@ -340,13 +377,18 @@ exports.renewSubscription = (req, res) => {
 
     const subscription = results[0];
 
-    db.query("SELECT duration_days FROM subscription_plans WHERE id = ? AND name IS NOT NULL", [subscription.planId], (err, planResults) => {
+    db.query("SELECT plan_code, name FROM subscription_plans WHERE id = ? AND name IS NOT NULL", [subscription.planId], (err, planResults) => {
       if (err || planResults.length === 0) {
         return res.status(404).json({ message: "Plan not found" });
       }
 
+      const configuredPlan = findConfiguredPlan(planResults[0]);
+      if (!configuredPlan) {
+        return res.status(404).json({ message: "Plan configuration not found in code" });
+      }
+
       const newEndDate = new Date();
-      newEndDate.setDate(newEndDate.getDate() + planResults[0].duration_days);
+      newEndDate.setDate(newEndDate.getDate() + configuredPlan.durationDays);
 
       db.query(
         "UPDATE subscriptions SET end_date = ?, status = 'active', renewal_date = NOW() WHERE id = ?",

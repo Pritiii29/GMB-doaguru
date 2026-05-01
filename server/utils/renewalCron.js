@@ -43,7 +43,7 @@ const checkRenewals = async () => {
             }
 
             // 2. Send mail to admin
-            const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+            const adminEmail = process.env.ADMIN_EMAIL || 'doaguruinfosystems@gmail.com';
             const adminSubject = `Client Renewal Alert: ${clientName}`;
             const adminHtml = `
                 <h3>Renewal Alert</h3>

@@ -1,6 +1,27 @@
 import axios from 'axios';
 
-const API_URL = `http://${window.location.hostname}:5000/api`;
+const resolveApiUrl = () => {
+  const configuredUrl = import.meta.env.VITE_API_URL?.trim();
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/$/, '');
+  }
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    const isLocalHost =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168.');
+
+    if (isLocalHost) {
+      return `${protocol}//${hostname}:5000/api`;
+    }
+  }
+
+  return 'https://gmb.doaguru.com/api';
+};
+
+const API_URL = resolveApiUrl();
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -9,6 +30,32 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+const createInFlightRequest = (requestFn) => {
+  let inFlightPromise = null;
+
+  return async (...args) => {
+    if (inFlightPromise) {
+      return inFlightPromise;
+    }
+
+    inFlightPromise = requestFn(...args).finally(() => {
+      inFlightPromise = null;
+    });
+
+    return inFlightPromise;
+  };
+};
+
+const getAdminNotificationsRequest = createInFlightRequest(async () => {
+  const response = await api.get('/admin/notifications');
+  return response.data;
+});
+
+const generateQRCodeRequest = createInFlightRequest(async () => {
+  const response = await api.get('/qr/generate');
+  return response.data;
 });
 
 export const reviewService = {
@@ -75,8 +122,7 @@ export const authService = {
 export const qrService = {
   generateQRCode: async () => {
     try {
-      const response = await api.get('/qr/generate');
-      return response.data;
+      return await generateQRCodeRequest();
     } catch (error) {
       console.error("API error during generateQRCode:", error);
       throw error.response?.data || error;
@@ -139,8 +185,7 @@ export const adminService = {
   },
   getNotifications: async () => {
     try {
-      const response = await api.get('/admin/notifications');
-      return response.data;
+      return await getAdminNotificationsRequest();
     } catch (error) {
       console.error("API error during getNotifications:", error);
       throw error.response?.data || error;

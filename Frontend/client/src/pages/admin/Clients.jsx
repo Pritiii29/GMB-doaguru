@@ -167,7 +167,7 @@ const Clients = () => {
                     <td className="px-6 py-4 align-top">
                       <div className="flex items-start gap-4">
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-xl shadow-sm border border-slate-200/50 ${client.isActive ? 'bg-gradient-to-br from-indigo-500 to-purple-500' : 'bg-slate-400'}`}>
-                          {client.logo ? <img src={`http://localhost:5000${client.logo}`} alt="logo" className="w-full h-full rounded-xl object-cover" /> : client.businessName?.charAt(0)?.toUpperCase() || "?"}
+                          {client.logo ? <img src={`https://gmb.doaguru.com/${client.logo}`} alt="logo" className="w-full h-full rounded-xl object-cover" /> : client.businessName?.charAt(0)?.toUpperCase() || "?"}
                         </div>
                         <div className="flex flex-col pt-0.5">
                           <p className="font-bold text-[15px] text-slate-900 truncate max-w-[200px]" title={client.businessName}>{client.businessName || "No Business Name"}</p>
@@ -310,7 +310,7 @@ const Clients = () => {
                     />
                     {editingClient && editingClient.logo && !logoFile && (
                       <div className="shrink-0">
-                        <img src={`http://localhost:5000${editingClient.logo}`} className="w-12 h-12 rounded-xl object-cover border border-slate-200" alt="Current Logo" />
+                        <img src={`https://gmb.doaguru.com/${editingClient.logo}`} className="w-12 h-12 rounded-xl object-cover border border-slate-200" alt="Current Logo" />
                       </div>
                     )}
                   </div>

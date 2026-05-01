@@ -28,9 +28,6 @@ async function registerAdmin(email, password) {
   }
 }
 
-// EXAMPLE USAGE:
-// registerAdmin("admin@example.com", "YourPassword123");
-
 const args = process.argv.slice(2);
 if (args.length >= 2) {
   registerAdmin(args[0], args[1]);

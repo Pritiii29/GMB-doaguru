@@ -175,6 +175,11 @@ const SubscriptionRedirect = () => {
                 }`}
               >
                 <div className={`p-8 text-center ${selectedPlan === plan.id ? 'bg-primary/10' : 'bg-slate-50'}`}>
+                  {plan.badge && (
+                    <div className="inline-block px-3 py-1 mb-4 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
+                      {plan.badge}
+                    </div>
+                  )}
                   <h3 className="text-2xl font-bold text-slate-900 mb-2">{plan.name}</h3>
                   <p className="text-slate-600 text-sm mb-4">{plan.description}</p>
 

@@ -6,7 +6,8 @@ exports.generateQRCode = async (req, res) => {
         const clientId = req.user?.clientId || req.user?.clientID || 'admin';
 
         // Define frontend base URL ideally from env
-        const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const baseUrl = process.env.FRONTEND_URL || 'https://gmb.doaguru.com/';
+
         const reviewUrl = `${baseUrl}/review?clientId=${clientId}`;
 
         // Generate QR Code as Data URI
